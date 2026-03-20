@@ -17,8 +17,8 @@ traco3 = "Sou sapeca"
 
 tracos = f"Meus traços de personalidade são: {traco1}, {traco2}, e {traco3}."
 
-pessoa1 = "Pessoa 1: Letícia, 18, Gotica Rabuda, Alternativa, Satanista."
-pessoa2 = "Pessoa 2: Maria do Carmo, 24, Mórmom, Conservadora, Sádica."
+pessoa1 = "Pessoa 1: Letícia, 19, Estudante de Design Gráfico, Fotografia analógica e garimpo em sebos, Criativa, Espontânea, Cabelo comprido, Alta."
+pessoa2 = "Pessoa 2: Maria do Carmo, 20, Estudante de Letras, Prática de Yoga e maratonar documentários de crimes reais, Analítica, Paciente, Cabelo curto e ondulado, baixa."
 existe = True
 if (existe):
     cabecalho = "Essas são caracteristicas minhas. Pode se referir a mim pelo nome mas não precisa mencionar ela sempre."
