@@ -19,7 +19,7 @@ tracos = f"Meus traços de personalidade são: {traco1}, {traco2}, e {traco3}."
 
 pessoa1 = "Pessoa 1: Letícia, 19, Estudante de Design Gráfico, Fotografia analógica e garimpo em sebos, Criativa, Espontânea, Cabelo comprido, Alta."
 pessoa2 = "Pessoa 2: Maria do Carmo, 20, Estudante de Letras, Prática de Yoga e maratonar documentários de crimes reais, Analítica, Paciente, Cabelo curto e ondulado, baixa."
-existe = True
+existe = False
 if (existe):
     cabecalho = "Essas são caracteristicas minhas. Pode se referir a mim pelo nome mas não precisa mencionar ela sempre."
 else:
@@ -32,7 +32,7 @@ def gerar_resposta_ia(prompt_usuario):
             messages=[
                 {
                     "role": "system",
-                    "content": f"Você me auxilia à encontrar meu amor da minha vida. {cabecalho} {nome}.{idade}.{tracos}, {pessoa1}, {pessoa2}"
+                    "content": f"Você me auxilia à encontrar meu amor da minha vida. {cabecalho} {nome}.{idade}. Responda em 2 linhas"
                 },
                 {
                     "role": "user",
@@ -58,11 +58,11 @@ if __name__ == "__main__":
     resposta = gerar_resposta_ia(pergunta)
     print(f"\nResposta da IA:\n{resposta}")
 """
-while(True):
-    pergunta = input("Digite sua pergunta para a IA (ou 'sair' para encerrar): ")
-    if pergunta.lower() == "sair":
-        print("Encerrando o programa. Até mais!")
-        break
+# while(True):
+#     pergunta = input("Digite sua pergunta para a IA (ou 'sair' para encerrar): ")
+#     if pergunta.lower() == "sair":
+#         print("Encerrando o programa. Até mais!")
+#         break
     
-    resposta = gerar_resposta_ia(pergunta)
-    print(f"\nResposta da IA:\n{resposta}\n")
+#     resposta = gerar_resposta_ia(pergunta)
+#     print(f"\nResposta da IA:\n{resposta}\n")

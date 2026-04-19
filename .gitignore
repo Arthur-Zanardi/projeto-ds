@@ -20,6 +20,7 @@ yarn-error.log*
 tmp/
 dist/
 build/
+*.pyc
 
 # --- Segredos e Configurações Pessoais ---
 .env.local

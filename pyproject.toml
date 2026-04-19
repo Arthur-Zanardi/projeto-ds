@@ -1,0 +1,33 @@
+[project]
+name = "match-ai"
+version = "0.1.0"
+description = "App de relacionamento baseado em afinidade real processada por IA"
+authors = [
+    {name = "Allanis Beatriz Oliveira Maia de Lima", email = "aboml@cin.ufpe.br"},
+    {name = "Arthur Maciel Costa Zanardi", email = "amcz@cin.ufpe.br"},
+    {name = "Emanuell Da Luz Caminha", email = "elc6@cin.ufpe.br"},
+    {name = "João Pedro Bezerra", email = "jpb@cin.ufpe.br"},
+    {name = "Nicolas Davi da Silva Souto", email = "ndss@cin.ufpe.br"},
+    {name = "Rafaell Bezerra Saraiva", email = "rbs10@cin.ufpe.br"},
+]
+dependencies = [
+    "flet>=0.84.0",
+    "pydantic>=2.12.5",
+    "python-dotenv>=1.2.2",
+    "chromadb>=1.5.8",
+]
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = [
+    "flet-cli>=0.84.0",
+    "flet-desktop>=0.84.0",
+    "flet-web>=0.84.0",
+]
+
+[tool.flet]
+desktop_flavor = "light"    # Change to "full" to use flet-audio and flet-video
+org = "com.matchai"
+product = "matchai"
+company = "MatchAI"
+copyright = "Copyright (C) 2026 by MatchAI"
