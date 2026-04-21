@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from src.services.llm_service import gerar_resposta_ia
+from src.services.llm_service import gerar_resposta_ia, extrair_vetores_da_conversa
 
 app = FastAPI(
     title="MatchAI API",
@@ -24,3 +24,13 @@ def conversar_com_ia(mensagem: MensagemUsuario):
     
     # E devolvemos a resposta no formato JSON
     return {"resposta": resposta}
+
+@app.post("/analisar_perfil")
+def analisar_perfil(mensagem: MensagemUsuario):
+    # Passamos o texto para a nossa nova função extratora
+    vetores_json = extrair_vetores_da_conversa(mensagem.texto)
+    
+    return {
+        "texto_analisado": mensagem.texto,
+        "vetores_calculados": vetores_json
+    }
