@@ -1,57 +1,59 @@
+import asyncio
 import flet as ft
-from dataclasses import field
+from src.views.login_view import loginView
+from src.views.chat_view import chatView
 
-# Classe padrão para os botões grandes
-@ft.control
-class DefaultButton(ft.Button):
-    expand: int = 1
-    style: ft.ButtonStyle = field(
-        default_factory=lambda: ft.ButtonStyle(
-            shape=ft.RoundedRectangleBorder(radius=10),
-            padding=24,
-        )
-    )
-
-@ft.control
-class LoginButton(DefaultButton):
-    bgcolor:    ft.Colors = "#fffbfc"
-    color:      ft.Colors = "#232d3b"
-
-@ft.control
-class SignUpButton(DefaultButton):
-    bgcolor:    "#ff6b6b"
-    color:      "#ffffff"
-
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.fonts = {"Google Sans Flex": "assets/fonts/GoogleSansFlex.ttf"}
 
-    # --- Instância dos botões ---
-    google_login = LoginButton(content=ft.Text("Continue with Google",size=14), icon=ft.Image(src="assets/icons/google.svg",width=24,height=24))
-    facebook_login = LoginButton(content=ft.Text("Continue with Facebook",size=14), icon=ft.Image(src="assets/icons/facebook.svg",width=24,height=24))
-    apple_login = LoginButton(content=ft.Text("Continue with Apple",size=14), icon=ft.Image(src="assets/icons/apple.svg",width=24,height=24))
-
-    # --- Organização da tela em uma única coluna ---
-    column = ft.Column(
-        # width=412,
-        # height=915,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        tight=True,
-        controls=[
-            google_login,
-            facebook_login,
-            apple_login,
-        ],
-    )
-
-    # --- Atributos da tela do app ---
-    page.title = "MatchAI"
-    page.theme_mode = ft.ThemeMode.LIGHT
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.title = "Match.AI"
     page.height=915
     page.width=412
     page.theme = ft.Theme(font_family="Google Sans Flex")
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
-    page.add(column)
+    async def open_login():
+        await page.push_route("/login")
+
+    async def open_chat():
+        await page.push_route("/chat")
+
+    def route_change():
+        print(f"Changed route to {page.route}")
+        page.views.clear()
+        page.views.append(
+            # Página Base
+
+            ft.View(
+                route="/",
+                controls=[
+                    ft.Text("Tela Base", size=32),
+                    ft.Button(content="Login", on_click=open_login),
+                    ft.Button(content="Chat", on_click=open_chat),
+                ],
+                vertical_alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            )
+        )
+
+        if page.route == "/login":
+            page.views.append(loginView())
+
+        if page.route == "/chat":
+            page.views.append(chatView())
+
+    async def view_pop(view):
+        print(top_view.route)
+        page.views.pop()
+        top_view = page.views[-1]
+        await page.push_route(top_view.route)
+
+
+    page.on_route_change = route_change
+    page.on_view_pop = view_pop
+
+    route_change()
 
 if __name__ == "__main__":
     ft.run(main)

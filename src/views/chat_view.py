@@ -1,7 +1,7 @@
 import flet as ft
-from src.services.llm_service import gerar_resposta_ia
+from src.services.llm_service import gerar_resposta_ia # Apenas para teste, o correto é chamar de Controller
 
-def main(page: ft.Page):
+def chatView():
     def send_clicked(e):
         messages_view.controls.append(
             ft.Container(
@@ -47,7 +47,6 @@ def main(page: ft.Page):
         content=(ft.Row(controls=[field,send_buttom])),
         height=100,
         width=350,
-        #padding=20,
     )
 
     column = ft.Column(
@@ -62,11 +61,7 @@ def main(page: ft.Page):
         ],
     )
 
-    page.title = "MatchAI"
-    page.theme_mode = ft.ThemeMode.LIGHT
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-
-    page.add(column)
-
-if __name__ == "__main__":
-    ft.run(main)
+    return ft.View(
+        route="/login",
+        controls=[column],
+    )
