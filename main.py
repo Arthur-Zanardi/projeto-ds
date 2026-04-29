@@ -1,70 +1,55 @@
 import flet as ft
-from src.services.llm_service import gerar_resposta_ia
+from dataclasses import field
+
+# Classe padrão para os botões grandes
+@ft.control
+class DefaultButton(ft.Button):
+    expand: int = 1
+    style: ft.ButtonStyle = field(
+        default_factory=lambda: ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=10),
+            padding=24,
+        )
+    )
+
+@ft.control
+class LoginButton(DefaultButton):
+    bgcolor:    ft.Colors = "#fffbfc"
+    color:      ft.Colors = "#232d3b"
+
+@ft.control
+class SignUpButton(DefaultButton):
+    bgcolor:    "#ff6b6b"
+    color:      "#ffffff"
 
 def main(page: ft.Page):
-    def send_clicked(e):
-        messages_view.controls.append(
-            ft.Container(
-                content=(ft.Row(controls=[ft.Text(f"{field.value}", size=24)], alignment=ft.CrossAxisAlignment.END)), 
-                bgcolor=ft.Colors.AMBER)
-        )
-        sent_messages.append(field.value)
-        field.value = ""
+    page.fonts = {"Google Sans Flex": "assets/fonts/GoogleSansFlex.ttf"}
 
-        messages_view.update()
+    # --- Instância dos botões ---
+    google_login = LoginButton(content=ft.Text("Continue with Google",size=14), icon=ft.Image(src="assets/icons/google.svg",width=24,height=24))
+    facebook_login = LoginButton(content=ft.Text("Continue with Facebook",size=14), icon=ft.Image(src="assets/icons/facebook.svg",width=24,height=24))
+    apple_login = LoginButton(content=ft.Text("Continue with Apple",size=14), icon=ft.Image(src="assets/icons/apple.svg",width=24,height=24))
 
-        response = gerar_resposta_ia(field.value)
-
-        messages_view.controls.append(
-            ft.Container(
-                content=(ft.Row(controls=[ft.Text(f"{response}", size=24)], wrap=True)), 
-                bgcolor=ft.Colors.BLUE_100,
-                width=350,
-                ),
-        )
-
-        messages_view.update()
-
-    sent_messages = []
-
-    field = ft.TextField(
-        hint_text="Digite aqui a sua mensagem",
-    )
-
-    send_buttom = ft.FilledIconButton(
-        icon=ft.Icons.SEND,
-        on_click=send_clicked,
-    )
-
-    messages_view = ft.Column(
-        height=700,
-        width=350,
-        alignment=ft.MainAxisAlignment.END,
-        controls=[],
-    )
-
-    sender_container = ft.Container(
-        content=(ft.Row(controls=[field,send_buttom])),
-        height=100,
-        width=350,
-        #padding=20,
-    )
-
+    # --- Organização da tela em uma única coluna ---
     column = ft.Column(
-        width=500,
-        height=1500,
-        spacing=12,
+        # width=412,
+        # height=915,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         tight=True,
         controls=[
-            messages_view,
-            sender_container, 
+            google_login,
+            facebook_login,
+            apple_login,
         ],
     )
 
+    # --- Atributos da tela do app ---
     page.title = "MatchAI"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.height=915
+    page.width=412
+    page.theme = ft.Theme(font_family="Google Sans Flex")
 
     page.add(column)
 
