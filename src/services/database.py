@@ -1,129 +1,284 @@
-import chromadb
-from chromadb.config import Settings
+from __future__ import annotations
 
-# 1. Inicializa o cliente para salvar os dados numa pasta chamada "banco_vetorial"
-chroma_client = chromadb.PersistentClient(path="./banco_vetorial")
+import json
+from functools import lru_cache
+from typing import Any
 
-# 2. Cria (ou carrega) a coleção (tabela) onde os usuários vão morar.
-# Usamos o espaço "cosine" (Similaridade de Cossenos), que é o padrão ouro na matemática para comparar perfis psicológicos e interesses.
-colecao_usuarios = chroma_client.get_or_create_collection(
-    name="perfis_matchai",
-    metadata={"hnsw:space": "cosine"} 
-)
+from src.schema.schema_vetores import flatten_profile_vectors, normalize_profile_vectors
 
-def salvar_perfil_usuario(id_usuario: str, nome: str, dados_extraidos_ia: dict):
-    """
-    Transforma o JSON extraído pela IA em uma lista reta (embedding) e salva no banco.
-    """
-    # 1. Extraímos os blocos do JSON (que vieram da sua função extrair_vetores_da_conversa)
-    psicologico = dados_extraidos_ia.get("psicologico", {})
-    valores = dados_extraidos_ia.get("valores", {})
-    interesses = dados_extraidos_ia.get("interesses", {})
 
-    # 2. Achata tudo em uma única lista gigante de números flutuantes (O "Vetor")
-    vetor_usuario = (
-        list(psicologico.values()) +
-        list(valores.values()) +
-        list(interesses.values())
+COLLECTION_NAME = "perfis_matchai"
+CHROMA_PATH = "./banco_vetorial"
+
+
+@lru_cache(maxsize=1)
+def _collection():
+    try:
+        import chromadb
+    except ImportError as exc:
+        print(f"ChromaDB indisponivel: {exc}")
+        return None
+
+    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    return client.get_or_create_collection(
+        name=COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine"},
     )
 
-    # 3. Salva no ChromaDB
-    colecao_usuarios.upsert(
+
+def salvar_perfil_usuario(
+    id_usuario: str,
+    nome: str,
+    dados_extraidos_ia: dict[str, Any],
+    bio: str = "",
+) -> list[float]:
+    profile_json = normalize_profile_vectors(dados_extraidos_ia)
+    vetor_usuario = flatten_profile_vectors(profile_json)
+    collection = _collection()
+    if collection is None:
+        return vetor_usuario
+
+    metadata = {
+        "nome": nome,
+        "bio": bio or "",
+        "profile_json": json.dumps(profile_json, ensure_ascii=False),
+    }
+    collection.upsert(
         ids=[id_usuario],
         embeddings=[vetor_usuario],
-        metadatas=[{"nome": nome}], # Aqui você pode adicionar idade, cidade, etc.
-        documents=[f"Perfil de {nome}"] 
+        metadatas=[metadata],
+        documents=[f"Perfil de {nome}"],
     )
-    
-    print(f"✅ Perfil de {nome} salvo com sucesso! Tamanho do vetor: {len(vetor_usuario)} dimensões.")
+    print(f"Perfil vetorial de {nome} salvo: {len(vetor_usuario)} dimensoes.")
     return vetor_usuario
 
-def buscar_melhor_match(id_usuario_buscando: str, vetor_do_usuario: list, quantidade: int = 1):
-    """
-    Busca no banco de dados a pessoa com o vetor mais próximo (menor distância).
-    """
-    resultados = colecao_usuarios.query(
+
+def buscar_melhor_match(
+    id_usuario_buscando: str,
+    vetor_do_usuario: list[float],
+    quantidade: int = 1,
+) -> list[dict[str, Any]]:
+    collection = _collection()
+    if collection is None:
+        return []
+
+    total_para_buscar = max(quantidade + 10, 12)
+    resultados = collection.query(
         query_embeddings=[vetor_do_usuario],
-        n_results=quantidade + 1, # Pedimos +1 porque o sistema vai achar o próprio usuário!
+        n_results=total_para_buscar,
+        include=["metadatas", "documents", "distances"],
     )
-    
-    # Precisamos filtrar para não dar match da pessoa com ela mesma
-    matches_reais = []
-    
-    for i in range(len(resultados['ids'][0])):
-        id_encontrado = resultados['ids'][0][i]
-        
-        # Ignora se o banco devolver o próprio usuário que está buscando
+
+    matches_reais: list[dict[str, Any]] = []
+    ids = resultados.get("ids", [[]])[0]
+    distances = resultados.get("distances", [[]])[0]
+    metadatas = resultados.get("metadatas", [[]])[0]
+
+    for index, id_encontrado in enumerate(ids):
         if id_encontrado == id_usuario_buscando:
             continue
-            
-        # Pega a distância (quanto mais perto de 0, mais parecido, pois usamos cosine distance)
-        distancia = resultados['distances'][0][i]
-        afinidade_porcentagem = round((1 - distancia) * 100, 1)
-        
-        metadados = resultados['metadatas'][0][i]
-        
-        matches_reais.append({
-            "id": id_encontrado,
-            "nome": metadados.get("nome", "Desconhecido"),
-            "afinidade": f"{afinidade_porcentagem}%",
-            "distancia_matematica": distancia
-        })
-        
-        # Se já achou a quantidade que queríamos (ex: top 1), para o loop
+
+        distancia = float(distances[index])
+        afinidade_porcentagem = round(max(0.0, (1 - distancia) * 100), 1)
+        metadados = metadatas[index] or {}
+        profile_json = _profile_from_metadata(metadados)
+
+        matches_reais.append(
+            {
+                "id": id_encontrado,
+                "nome": metadados.get("nome", "Desconhecido"),
+                "bio": metadados.get("bio", ""),
+                "afinidade": f"{afinidade_porcentagem}%",
+                "afinidade_numero": afinidade_porcentagem,
+                "distancia_matematica": distancia,
+                "profile_json": profile_json,
+            }
+        )
+
         if len(matches_reais) == quantidade:
             break
 
     return matches_reais
 
-def popular_banco_mock():
-    # Cria os perfis de teste caso o banco esteja vazio
-    resultados = colecao_usuarios.get()
-    if len(resultados['ids']) == 0:
-        print("Populando banco com perfis de teste...")
-        
-        # Use aqueles mesmos dicionários de teste (perfil_maria, perfil_carmen, etc)
-        perfil_maria = { ... } # (Cole aqui o JSON da Maria que usamos antes)
-        perfil_carmen = { ... } # (Cole aqui o JSON da Carmen que usamos antes)
-        
-        salvar_perfil_usuario("user_maria", "Maria", perfil_maria)
-        salvar_perfil_usuario("user_carmen", "Carmen", perfil_carmen)
-        print("Perfis de teste criados!")
 
-# --- ÁREA DE TESTE ---
-if __name__ == "__main__":
-    
-    # 1. O seu perfil (Exatamente como a API gerou)
-    perfil_rafaell = {
-        "psicologico": {"extroversao": 0.5, "abertura_experiencias": 0.5, "romantismo_afeto": 0.5, "ritmo_vida": 0.5, "logica_vs_emocao": 0.6, "resolucao_conflitos": 0.5, "competitividade_cooperacao": 0.6},
-        "valores": {"ambicao_carreira": 0.5, "conservadorismo": 0.5, "espectro_politico": 0.5, "gestao_financeira": 0.5, "religiosidade": 0.5, "gosto_festas": 0.5},
-        "interesses": {"animes": 1.0, "filmes": 0.5, "series": 0.5, "livros_ficcao": 0.5, "videogames": 0.5, "jogos_tabuleiro": 0.5, "tecnologia": 0.5, "academia": 0.7, "esportes": 0.7, "futebol": 1.0, "dancas": 0.5, "musica": 0.5, "tocar_instrumentos": 0.5, "fotografia": 0.5, "culinaria": 0.5, "idiomas": 0.5, "celebridades": 0.5, "historia": 0.5, "geografia": 0.5, "geopolitica": 0.5, "astronomia": 0.5}
+def obter_perfil_vetorial(id_usuario: str) -> dict[str, Any] | None:
+    collection = _collection()
+    if collection is None:
+        return None
+
+    resultado = collection.get(ids=[id_usuario], include=["metadatas"])
+    if not resultado.get("ids"):
+        return None
+
+    metadata = (resultado.get("metadatas") or [{}])[0] or {}
+    return {
+        "id": id_usuario,
+        "nome": metadata.get("nome", "Desconhecido"),
+        "bio": metadata.get("bio", ""),
+        "profile_json": _profile_from_metadata(metadata),
     }
 
-    # 2. Perfil de uma garota compatível (Também adora animes, futebol e academia)
-    perfil_maria = {
-        "psicologico": {"extroversao": 0.6, "abertura_experiencias": 0.6, "romantismo_afeto": 0.5, "ritmo_vida": 0.6, "logica_vs_emocao": 0.7, "resolucao_conflitos": 0.5, "competitividade_cooperacao": 0.5},
-        "valores": {"ambicao_carreira": 0.6, "conservadorismo": 0.4, "espectro_politico": 0.5, "gestao_financeira": 0.6, "religiosidade": 0.4, "gosto_festas": 0.6},
-        "interesses": {"animes": 0.9, "filmes": 0.6, "series": 0.7, "livros_ficcao": 0.8, "videogames": 0.7, "jogos_tabuleiro": 0.4, "tecnologia": 0.6, "academia": 0.8, "esportes": 0.8, "futebol": 0.9, "dancas": 0.3, "musica": 0.6, "tocar_instrumentos": 0.2, "fotografia": 0.4, "culinaria": 0.6, "idiomas": 0.6, "celebridades": 0.2, "historia": 0.5, "geografia": 0.4, "geopolitica": 0.5, "astronomia": 0.5}
-    }
 
-    # 3. Perfil totalmente incompatível (Odeia animes, esportes e futebol, totalmente voltada à religião e tradição)
-    perfil_carmen = {
-        "psicologico": {"extroversao": 0.2, "abertura_experiencias": 0.2, "romantismo_afeto": 0.8, "ritmo_vida": 0.2, "logica_vs_emocao": 0.2, "resolucao_conflitos": 0.2, "competitividade_cooperacao": 0.2},
-        "valores": {"ambicao_carreira": 0.2, "conservadorismo": 1.0, "espectro_politico": 0.9, "gestao_financeira": 0.2, "religiosidade": 1.0, "gosto_festas": 0.0},
-        "interesses": {"animes": 0.0, "filmes": 0.2, "series": 0.2, "livros_ficcao": 0.1, "videogames": 0.0, "jogos_tabuleiro": 0.1, "tecnologia": 0.1, "academia": 0.0, "esportes": 0.0, "futebol": 0.0, "dancas": 0.1, "musica": 0.5, "tocar_instrumentos": 0.0, "fotografia": 0.1, "culinaria": 0.8, "idiomas": 0.1, "celebridades": 0.8, "historia": 0.2, "geografia": 0.2, "geopolitica": 0.1, "astronomia": 0.0}
-    }
+def popular_banco_mock() -> None:
+    collection = _collection()
+    if collection is None:
+        return
 
-    print("Gerando e salvando vetores de 34 dimensões...")
-    # Salvando no banco (A função salvar_perfil_usuario vai transformar os 34 valores em uma única lista)
-    vetor_rafa = salvar_perfil_usuario("user_rafaell", "Rafaell", perfil_rafaell)
-    salvar_perfil_usuario("user_maria", "Maria", perfil_maria)
-    salvar_perfil_usuario("user_carmen", "Carmen", perfil_carmen)
+    perfis = [
+        (
+            "user_maria",
+            "Maria",
+            "Designer, leitora de fantasia e parceira para jogos, academia e futebol.",
+            {
+                "psicologico": {
+                    "extroversao": 0.6,
+                    "abertura_experiencias": 0.7,
+                    "romantismo_afeto": 0.7,
+                    "ritmo_vida": 0.6,
+                    "logica_vs_emocao": 0.6,
+                    "resolucao_conflitos": 0.5,
+                    "competitividade_cooperacao": 0.4,
+                },
+                "valores": {
+                    "ambicao_carreira": 0.7,
+                    "conservadorismo": 0.3,
+                    "espectro_politico": 0.35,
+                    "gestao_financeira": 0.6,
+                    "religiosidade": 0.2,
+                    "gosto_festas": 0.5,
+                },
+                "interesses": {
+                    "animes": 0.9,
+                    "filmes": 0.7,
+                    "series": 0.8,
+                    "livros_ficcao": 0.9,
+                    "videogames": 0.7,
+                    "jogos_tabuleiro": 0.6,
+                    "tecnologia": 0.6,
+                    "academia": 0.8,
+                    "esportes": 0.8,
+                    "futebol": 0.9,
+                    "dancas": 0.4,
+                    "musica": 0.7,
+                    "tocar_instrumentos": 0.3,
+                    "fotografia": 0.5,
+                    "culinaria": 0.6,
+                    "idiomas": 0.6,
+                    "celebridades": 0.2,
+                    "historia": 0.5,
+                    "geografia": 0.4,
+                    "geopolitica": 0.5,
+                    "astronomia": 0.5,
+                },
+            },
+        ),
+        (
+            "user_luiza",
+            "Luiza",
+            "Musica, astronomia, conversas profundas e rotina mais tranquila.",
+            {
+                "psicologico": {
+                    "extroversao": 0.35,
+                    "abertura_experiencias": 0.85,
+                    "romantismo_afeto": 0.8,
+                    "ritmo_vida": 0.35,
+                    "logica_vs_emocao": 0.35,
+                    "resolucao_conflitos": 0.45,
+                    "competitividade_cooperacao": 0.25,
+                },
+                "valores": {
+                    "ambicao_carreira": 0.55,
+                    "conservadorismo": 0.15,
+                    "espectro_politico": 0.2,
+                    "gestao_financeira": 0.6,
+                    "religiosidade": 0.1,
+                    "gosto_festas": 0.15,
+                },
+                "interesses": {
+                    "animes": 0.7,
+                    "filmes": 0.6,
+                    "series": 0.7,
+                    "livros_ficcao": 0.8,
+                    "videogames": 0.4,
+                    "jogos_tabuleiro": 0.5,
+                    "tecnologia": 0.7,
+                    "academia": 0.4,
+                    "esportes": 0.2,
+                    "futebol": 0.1,
+                    "dancas": 0.4,
+                    "musica": 0.95,
+                    "tocar_instrumentos": 0.9,
+                    "fotografia": 0.6,
+                    "culinaria": 0.6,
+                    "idiomas": 0.7,
+                    "celebridades": 0.2,
+                    "historia": 0.6,
+                    "geografia": 0.6,
+                    "geopolitica": 0.7,
+                    "astronomia": 0.95,
+                },
+            },
+        ),
+        (
+            "user_carmen",
+            "Carmen",
+            "Caseira, religiosa, conservadora e apaixonada por culinaria.",
+            {
+                "psicologico": {
+                    "extroversao": 0.25,
+                    "abertura_experiencias": 0.2,
+                    "romantismo_afeto": 0.8,
+                    "ritmo_vida": 0.25,
+                    "logica_vs_emocao": 0.25,
+                    "resolucao_conflitos": 0.3,
+                    "competitividade_cooperacao": 0.2,
+                },
+                "valores": {
+                    "ambicao_carreira": 0.35,
+                    "conservadorismo": 0.95,
+                    "espectro_politico": 0.85,
+                    "gestao_financeira": 0.55,
+                    "religiosidade": 0.95,
+                    "gosto_festas": 0.05,
+                },
+                "interesses": {
+                    "animes": 0.0,
+                    "filmes": 0.3,
+                    "series": 0.3,
+                    "livros_ficcao": 0.2,
+                    "videogames": 0.0,
+                    "jogos_tabuleiro": 0.1,
+                    "tecnologia": 0.1,
+                    "academia": 0.2,
+                    "esportes": 0.1,
+                    "futebol": 0.0,
+                    "dancas": 0.1,
+                    "musica": 0.55,
+                    "tocar_instrumentos": 0.0,
+                    "fotografia": 0.2,
+                    "culinaria": 0.9,
+                    "idiomas": 0.2,
+                    "celebridades": 0.7,
+                    "historia": 0.3,
+                    "geografia": 0.3,
+                    "geopolitica": 0.15,
+                    "astronomia": 0.1,
+                },
+            },
+        ),
+    ]
 
-    print("\nCalculando o Match perfeito para o Rafaell...")
-    # Buscando proximidade vetorial
-    melhores_matches = buscar_melhor_match("user_rafaell", vetor_rafa, quantidade=1)
-    
-    print("\n--- RESULTADO ---")
-    for match in melhores_matches:
-        print(f"Você deu match com {match['nome']}! Afinidade: {match['afinidade']}")
+    for user_id, nome, bio, profile_json in perfis:
+        salvar_perfil_usuario(user_id, nome, profile_json, bio=bio)
+
+
+def _profile_from_metadata(metadata: dict[str, Any]) -> dict[str, dict[str, float]]:
+    raw = metadata.get("profile_json")
+    if isinstance(raw, str):
+        try:
+            return normalize_profile_vectors(json.loads(raw))
+        except json.JSONDecodeError:
+            pass
+    if isinstance(raw, dict):
+        return normalize_profile_vectors(raw)
+    return normalize_profile_vectors({})

@@ -11,10 +11,15 @@ authors = [
     {name = "Rafaell Bezerra Saraiva", email = "rbs10@cin.ufpe.br"},
 ]
 dependencies = [
+    "fastapi>=0.115.0",
     "flet>=0.84.0",
+    "groq>=1.1.1",
+    "psycopg[binary]>=3.2.0",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.2",
     "chromadb>=1.5.8",
+    "requests>=2.32.5",
+    "uvicorn[standard]>=0.32.0",
 ]
 requires-python = ">=3.10"
 

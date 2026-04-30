@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: matchai-postgres
+    environment:
+      POSTGRES_DB: matchai
+      POSTGRES_USER: matchai
+      POSTGRES_PASSWORD: matchai
+    ports:
+      - "5432:5432"
+    volumes:
+      - matchai_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matchai -d matchai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  matchai_postgres_data:
