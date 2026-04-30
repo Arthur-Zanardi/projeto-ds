@@ -69,7 +69,7 @@ def main(page: ft.Page):
 
                 resposta = await asyncio.to_thread(
                     requests.post,
-                    "http://127.0.0.1:8000/dar_match",
+                    "http://127.0.0.1:8001/dar_match",
                     timeout=45,
                     json={"texto": historico_completo},
                 )
@@ -129,7 +129,7 @@ def main(page: ft.Page):
 
         try:
             resposta_api = requests.post(
-                "http://127.0.0.1:8000/chat",
+                "http://127.0.0.1:8001/chat",
                 timeout=15,
                 json={"texto": mensagem_usuario}
             )
@@ -171,7 +171,7 @@ def main(page: ft.Page):
     # --- NOVO: Função que puxa o histórico ao abrir ---
     def carregar_historico_inicial():
         try:
-            resposta = requests.get("http://127.0.0.1:8000/historico", timeout=5)
+            resposta = requests.get("http://127.0.0.1:8001/historico", timeout=5)
             if resposta.status_code == 200:
                 mensagens = resposta.json().get("historico", [])
                 for msg in mensagens:
