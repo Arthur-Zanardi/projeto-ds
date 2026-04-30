@@ -2,6 +2,7 @@ import asyncio
 import flet as ft
 from src.views.login_view import loginView
 from src.views.chat_view import chatView
+from src.views.match_view import matchView
 
 async def main(page: ft.Page):
     page.fonts = {"Google Sans Flex": "assets/fonts/GoogleSansFlex.ttf"}
@@ -12,6 +13,7 @@ async def main(page: ft.Page):
     page.theme = ft.Theme(font_family="Google Sans Flex")
     page.theme_mode = ft.ThemeMode.LIGHT
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.padding = 0
 
     async def open_login():
         await page.push_route("/login")
@@ -19,18 +21,25 @@ async def main(page: ft.Page):
     async def open_chat():
         await page.push_route("/chat")
 
+    async def open_match_screen():
+        await page.push_route("/match")
+
     def route_change():
         print(f"Changed route to {page.route}")
         page.views.clear()
         page.views.append(
             # Página Base
-            #chatView(page.width, page.height)
+            # chatView(page)
+            # loginView(page)
+            # matchView(page)
             ft.View(
                 route="/",
                 controls=[
                     ft.Text("Tela Base", size=32),
+                    ft.Text("Ambiente para testes", size=26),
                     ft.Button(content="Login", on_click=open_login),
                     ft.Button(content="Chat", on_click=open_chat),
+                    ft.Button(content="Match", on_click=open_match_screen),
                 ],
                 vertical_alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -38,17 +47,20 @@ async def main(page: ft.Page):
         )
 
         if page.route == "/login":
-            page.views.append(loginView())
+            page.views.append(loginView(page))
 
         if page.route == "/chat":
-            page.views.append(chatView(page.width, page.height))
+            page.views.append(chatView(page))
+        
+        if page.route == "/match":
+            page.views.append(matchView(page))
 
-    async def view_pop(view):
-        print(top_view.route)
-        page.views.pop()
-        top_view = page.views[-1]
-        await page.push_route(top_view.route)
-
+    async def view_pop(e):
+        if e.view is not None:
+            print("View pop:", e.view)
+            page.views.remove(e.view)
+            top_view = page.views[-1]
+            await page.push_route(top_view.route)
 
     page.on_route_change = route_change
     page.on_view_pop = view_pop
