@@ -1,5 +1,5 @@
 import flet as ft
-from src.services.llm_service import gerar_resposta_ia # Apenas para teste, o correto é chamar de Controller
+from src.services.llm_conversation import llm_conversation
 
 def chatView():
     def send_clicked(e):
@@ -8,12 +8,15 @@ def chatView():
                 content=(ft.Row(controls=[ft.Text(f"{field.value}", size=24)], alignment=ft.CrossAxisAlignment.END)), 
                 bgcolor=ft.Colors.AMBER)
         )
-        sent_messages.append(field.value)
-        field.value = ""
+        
+        field.value = " "
 
         messages_view.update()
+        recieve_message()
+    
+    def recieve_message():
 
-        response = gerar_resposta_ia(field.value)
+        response = llm_conversation(field.value)
 
         messages_view.controls.append(
             ft.Container(
@@ -25,8 +28,6 @@ def chatView():
 
         messages_view.update()
 
-    sent_messages = []
-
     field = ft.TextField(
         hint_text="Digite aqui a sua mensagem",
     )
@@ -36,11 +37,10 @@ def chatView():
         on_click=send_clicked,
     )
 
-    messages_view = ft.Column(
-        height=700,
-        width=350,
-        alignment=ft.MainAxisAlignment.END,
-        controls=[],
+    messages_view = ft.ListView(
+        expand=True,
+        spacing=8,
+        auto_scroll=True,
     )
 
     sender_container = ft.Container(
@@ -50,11 +50,8 @@ def chatView():
     )
 
     column = ft.Column(
-        width=500,
-        height=1500,
-        spacing=12,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        tight=True,
+        expand=True,
+        #tight=True,
         controls=[
             messages_view,
             sender_container, 
