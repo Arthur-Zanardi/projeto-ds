@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from src.services.llm_service import gerar_resposta_ia, extrair_vetores_da_conversa
+from src.services.database import salvar_perfil_usuario, buscar_melhor_match, popular_banco_mock
+from src.services.sqlite_db import iniciar_banco_sqlite, salvar_mensagem, salvar_vetores_sqlite, obter_historico_chat
 
 app = FastAPI(
     title="MatchAI API",
@@ -8,29 +10,45 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Definimos como deve ser o "corpo" da requisição JSON que a API vai receber
+popular_banco_mock()
+iniciar_banco_sqlite() 
+
 class MensagemUsuario(BaseModel):
     texto: str
 
 @app.get("/")
 def read_root():
-    return {"mensagem": "API do MatchAI está rodando perfeitamente!"}
+    return {"mensagem": "API do MatchAI está a correr perfeitamente!"}
 
-# Criamos uma rota POST para enviar os dados para a IA
+@app.get("/historico")
+def pegar_historico():
+    # Nova rota que envia o histórico salvo para o aplicativo Flet
+    historico = obter_historico_chat(usuario="user_rafaell")
+    return {"historico": historico}
+
 @app.post("/chat")
 def conversar_com_ia(mensagem: MensagemUsuario):
-    # Aqui chamamos a sua função passando o texto que chegou na requisição
+    salvar_mensagem(usuario="user_rafaell", remetente="usuario", mensagem=mensagem.texto)
     resposta = gerar_resposta_ia(mensagem.texto)
-    
-    # E devolvemos a resposta no formato JSON
+    salvar_mensagem(usuario="user_rafaell", remetente="ia", mensagem=resposta)
     return {"resposta": resposta}
 
 @app.post("/analisar_perfil")
 def analisar_perfil(mensagem: MensagemUsuario):
-    # Passamos o texto para a nossa nova função extratora
     vetores_json = extrair_vetores_da_conversa(mensagem.texto)
-    
     return {
         "texto_analisado": mensagem.texto,
         "vetores_calculados": vetores_json
     }
+
+@app.post("/dar_match")
+def calcular_match_final(mensagem: MensagemUsuario):
+    vetores_json = extrair_vetores_da_conversa(mensagem.texto)
+    salvar_vetores_sqlite(usuario="user_rafaell", vetores_dict=vetores_json)
+    vetor_calculado = salvar_perfil_usuario("user_rafaell", "Rafaell", vetores_json)
+    melhores_matches = buscar_melhor_match("user_rafaell", vetor_calculado, quantidade=1)
+    
+    if melhores_matches:
+        return {"sucesso": True, "match": melhores_matches[0]}
+    else:
+        return {"sucesso": False, "mensagem": "Nenhum match encontrado."}
