@@ -31,3 +31,6 @@ org = "com.matchai"
 product = "matchai"
 company = "MatchAI"
 copyright = "Copyright (C) 2026 by MatchAI"
+
+[tool.fastapi]
+entrypoint = "src.controllers.api:app"

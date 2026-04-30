@@ -1,14 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-import sys
-from pathlib import Path
-
-root = Path('/src/services').resolve()
-if str(root) not in sys.path:
-    sys.path.insert(0, str(root))
-
-from llm_service import gerar_resposta_ia, extrair_vetores_da_conversa
+from src.services.llm_service import gerar_resposta_ia, extrair_vetores_da_conversa
 
 
 app = FastAPI(

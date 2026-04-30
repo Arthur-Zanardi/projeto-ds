@@ -24,7 +24,7 @@ async def main(page: ft.Page):
         page.views.clear()
         page.views.append(
             # Página Base
-            chatView()
+            chatView(page.width, page.height)
             # ft.View(
             #     route="/",
             #     controls=[
@@ -41,7 +41,7 @@ async def main(page: ft.Page):
             page.views.append(loginView())
 
         if page.route == "/chat":
-            page.views.append(chatView())
+            page.views.append(chatView(page.width, page.height))
 
     async def view_pop(view):
         print(top_view.route)

@@ -1,7 +1,7 @@
 import flet as ft
 from src.services.llm_conversation import llm_conversation
 
-def chatView():
+def chatView(width, height):
     def send_clicked(e):
         messages_view.controls.append(
             ft.Container(
@@ -30,6 +30,7 @@ def chatView():
 
     field = ft.TextField(
         hint_text="Digite aqui a sua mensagem",
+        expand=True,
     )
 
     send_buttom = ft.FilledIconButton(
@@ -45,8 +46,9 @@ def chatView():
 
     sender_container = ft.Container(
         content=(ft.Row(controls=[field,send_buttom])),
-        height=100,
-        width=350,
+        height= max(50, height*0.08),
+        alignment= ft.Alignment.CENTER,
+        #bgcolor="#000000",
     )
 
     column = ft.Column(
