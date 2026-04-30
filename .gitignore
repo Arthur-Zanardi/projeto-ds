@@ -1,6 +1,7 @@
 # --- Ambientes Virtuais e Dependências ---
 node_modules/
 venv/
+.venv/
 env/
 .env
 bin/

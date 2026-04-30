@@ -3,7 +3,7 @@ import requests
 def llm_conversation(mensagem_usuario):
     try:
         resposta_api = requests.post(
-            "http://127.0.0.1:8001/chat",
+            "http://127.0.0.1:8000/chat",
             timeout=15,
             json={"texto": mensagem_usuario}
         )

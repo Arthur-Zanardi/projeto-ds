@@ -1,5 +1,6 @@
 import flet as ft
 from src.services.llm_conversation import llm_conversation
+from src.services.api_client import enviar_mensagem_chat, carregar_historico
 
 def chatView(page):
     async def goto_match_screen():

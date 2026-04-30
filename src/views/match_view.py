@@ -1,4 +1,5 @@
 import flet as ft
+from src.services.api_client import dar_match
 
 def matchView(page):
     async def go_back():
