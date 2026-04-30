@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import os
@@ -21,7 +21,7 @@ from src.schema.schema_vetores import (
 
 API_BASE = os.getenv("MATCHAI_API_URL", "http://127.0.0.1:8000")
 API_DOWN_MESSAGE = (
-    "A API local não está rodando em 127.0.0.1:8000. "
+    "A API local nÃ£o estÃ¡ rodando em 127.0.0.1:8000. "
     "Abra o app pelo launcher: python scripts/run_matchai.py "
     "ou use o start_matchai.bat."
 )
@@ -426,7 +426,7 @@ def main(page: ft.Page):
             can_reveal_password=True,
             border_color=palette["accent"],
         )
-        display_name = ft.TextField(label="Nome para exibição", border_color=palette["accent"])
+        display_name = ft.TextField(label="Nome para exibiÃ§Ã£o", border_color=palette["accent"])
         status = ft.Text("", color=palette["muted"])
 
         async def submit_login(event: Any) -> None:
@@ -486,7 +486,7 @@ def main(page: ft.Page):
             async def work() -> None:
                 data = await api_request_async("GET", "/auth/google/start", auth=False)
                 if not data.get("enabled"):
-                    status.value = data.get("mensagem", "Google OAuth indisponível.")
+                    status.value = data.get("mensagem", "Google OAuth indisponÃ­vel.")
                     page.update()
                     return
                 page.launch_url(data["auth_url"])
@@ -523,7 +523,7 @@ def main(page: ft.Page):
                                         color=palette["primary"],
                                     ),
                                     ft.Text(
-                                        "Crie conexões por valores, rotina e afinidade real.",
+                                        "Crie conexÃµes por valores, rotina e afinidade real.",
                                         size=16,
                                         color=palette["muted"],
                                     ),
@@ -576,7 +576,7 @@ def main(page: ft.Page):
         category_fields: dict[str, ft.Dropdown] = {}
         toggle_fields: dict[str, ft.Dropdown] = {}
         gender_field = ft.Dropdown(
-            label="Seu gênero",
+            label="Seu gÃªnero",
             width=300,
             value=profile.get("gender_identity") or "nao_informar",
             options=[
@@ -615,7 +615,7 @@ def main(page: ft.Page):
                 label=label,
                 value=category_value(keys),
                 options=[
-                    ft.dropdown.Option("neutral", "Prefiro não responder"),
+                    ft.dropdown.Option("neutral", "Prefiro nÃ£o responder"),
                     *[
                         ft.dropdown.Option(key, PHYSICAL_LABELS.get(key, key))
                         for key in keys
@@ -631,9 +631,9 @@ def main(page: ft.Page):
                 label=PHYSICAL_LABELS.get(key, key),
                 value=toggle_value(key),
                 options=[
-                    ft.dropdown.Option("neutral", "Prefiro não responder"),
+                    ft.dropdown.Option("neutral", "Prefiro nÃ£o responder"),
                     ft.dropdown.Option("yes", "Sim"),
-                    ft.dropdown.Option("no", "Não"),
+                    ft.dropdown.Option("no", "NÃ£o"),
                 ],
             )
             toggle_fields[key] = dropdown
@@ -667,7 +667,7 @@ def main(page: ft.Page):
                 status.value = "Tudo salvo. Agora a IA pode te conhecer melhor."
                 render_onboarding()
 
-            await run_guarded(event, work, status=status, busy_text="Salvando suas características...")
+            await run_guarded(event, work, status=status, busy_text="Salvando suas caracterÃ­sticas...")
 
         page.clean()
         page.add(
@@ -691,23 +691,23 @@ def main(page: ft.Page):
                                 scroll=ft.ScrollMode.AUTO,
                                 controls=[
                                     ft.Text(
-                                        "Conte sobre você",
+                                        "Conte sobre vocÃª",
                                         size=sp(34),
                                         weight=ft.FontWeight.BOLD,
                                         color=palette["primary"],
                                     ),
                                     ft.Text(
-                                        "Escolha as opções que descrevem você. Se preferir, pode pular qualquer resposta.",
+                                        "Escolha as opÃ§Ãµes que descrevem vocÃª. Se preferir, pode pular qualquer resposta.",
                                         size=sp(16),
                                         color=palette["muted"],
                                     ),
-                                    section_title("Quem é você"),
+                                    section_title("Quem Ã© vocÃª"),
                                     ft.Row(
                                         wrap=True,
                                         spacing=12,
                                         controls=[gender_field, interest_field],
                                     ),
-                                    section_title("Suas características"),
+                                    section_title("Suas caracterÃ­sticas"),
                                     *category_controls,
                                     *toggle_controls,
                                     primary_button(
@@ -733,7 +733,7 @@ def main(page: ft.Page):
         history = api_request("GET", "/historico").get("historico", [])
         messages_view = ft.ListView(expand=True, spacing=10, auto_scroll=True)
         input_field = ft.TextField(
-            hint_text="Conte sobre você, sua rotina, seus gostos ou seus valores...",
+            hint_text="Conte sobre vocÃª, sua rotina, seus gostos ou seus valores...",
             expand=True,
             multiline=True,
             min_lines=1,
@@ -781,10 +781,10 @@ def main(page: ft.Page):
                     True,
                     45,
                 )
-                add_bubble("ia", data.get("resposta", "Não consegui responder agora."))
+                add_bubble("ia", data.get("resposta", "NÃ£o consegui responder agora."))
                 status.value = ""
 
-            await run_guarded(event, work, status=status, busy_text="A IA está pensando...")
+            await run_guarded(event, work, status=status, busy_text="A IA estÃ¡ pensando...")
 
         async def analyze_profile(event: Any) -> None:
             async def work() -> None:
@@ -804,15 +804,15 @@ def main(page: ft.Page):
                 else:
                     status.value = data.get("mensagem", "Nenhum match encontrado.")
 
-            await run_guarded(event, work, status=status, busy_text="Buscando pessoas compatíveis...")
+            await run_guarded(event, work, status=status, busy_text="Buscando pessoas compatÃ­veis...")
 
         suggestions = [
-            ("Hobbies", "Quero falar sobre meus hobbies e o que eu faço no tempo livre."),
-            ("Música", "Música e arte dizem muito sobre mim. Vamos por esse caminho."),
-            ("Rotina", "Quero contar como é minha rotina e o ritmo de vida que combina comigo."),
-            ("Valores", "Prefiro falar sobre meus valores, limites e visão de mundo."),
-            ("Relação", "Quero explicar que tipo de relação e conexão profunda eu procuro."),
-            ("Preferências", "Quero contar também que tipos de características me atraem."),
+            ("Hobbies", "Quero falar sobre meus hobbies e o que eu faÃ§o no tempo livre."),
+            ("MÃºsica", "MÃºsica e arte dizem muito sobre mim. Vamos por esse caminho."),
+            ("Rotina", "Quero contar como Ã© minha rotina e o ritmo de vida que combina comigo."),
+            ("Valores", "Prefiro falar sobre meus valores, limites e visÃ£o de mundo."),
+            ("RelaÃ§Ã£o", "Quero explicar que tipo de relaÃ§Ã£o e conexÃ£o profunda eu procuro."),
+            ("PreferÃªncias", "Quero contar tambÃ©m que tipos de caracterÃ­sticas me atraem."),
         ]
 
         chips = ft.Row(
@@ -872,7 +872,7 @@ def main(page: ft.Page):
                 ),
             ],
         )
-        shell("Conte sobre você", "chat", body)
+        shell("Conte sobre vocÃª", "chat", body)
 
     def render_matches() -> None:
         palette = colors()
@@ -882,7 +882,7 @@ def main(page: ft.Page):
         if not matches:
             controls.append(
                 ft.Text(
-                    "Converse com a IA e use Dar match para encontrar pessoas compatíveis.",
+                    "Converse com a IA e use Dar match para encontrar pessoas compatÃ­veis.",
                     color=palette["muted"],
                 )
             )
@@ -918,7 +918,7 @@ def main(page: ft.Page):
                 )
             )
         body = ft.Column(expand=True, scroll=ft.ScrollMode.AUTO, controls=controls)
-        shell("Pessoas com interesses e valores compatíveis", "matches", body)
+        shell("Pessoas com interesses e valores compatÃ­veis", "matches", body)
 
     def render_match_detail(match_id: str) -> None:
         palette = colors()
@@ -976,7 +976,7 @@ def main(page: ft.Page):
                 data = await api_request_async("POST", f"/matches/{match_id}/icebreaker")
                 icebreaker_text.value = data.get("sugestao", "")
 
-            await run_guarded(event, work, status=icebreaker_text, busy_text="Gerando sugestão...")
+            await run_guarded(event, work, status=icebreaker_text, busy_text="Gerando sugestÃ£o...")
 
         async def send_match_message(event: Any) -> None:
             text = (message_field.value or "").strip()
@@ -1009,7 +1009,7 @@ def main(page: ft.Page):
                 height=150,
                 border_radius=18,
                 bgcolor=palette["surface_alt"],
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment(0, 0),
                 content=ft.Icon(ft.Icons.PERSON, size=64, color=palette["primary"]),
             )
 
@@ -1144,10 +1144,10 @@ def main(page: ft.Page):
         state["profile"] = profile
         vectors = profile.get("vector_json") or profile.get("profile_json") or default_profile_vectors()
         physical_current = vectors.get("fisico", {})
-        display_name = ft.TextField(label="Nome público", value=profile.get("display_name", ""))
-        bio = ft.TextField(label="Bio pública", value=profile.get("bio", ""), multiline=True, min_lines=2)
+        display_name = ft.TextField(label="Nome pÃºblico", value=profile.get("display_name", ""))
+        bio = ft.TextField(label="Bio pÃºblica", value=profile.get("bio", ""), multiline=True, min_lines=2)
         gender_field = ft.Dropdown(
-            label="Seu gênero",
+            label="Seu gÃªnero",
             width=300,
             value=profile.get("gender_identity") or "nao_informar",
             options=[ft.dropdown.Option(key, label) for key, label in GENDER_LABELS.items()],
@@ -1163,8 +1163,8 @@ def main(page: ft.Page):
             "bio": ft.Checkbox(label="Mostrar bio", value=visibility.get("bio", True)),
             "interesses": ft.Checkbox(label="Mostrar interesses", value=visibility.get("interesses", True)),
             "valores": ft.Checkbox(label="Mostrar valores", value=visibility.get("valores", False)),
-            "psicologico": ft.Checkbox(label="Mostrar traços pessoais", value=visibility.get("psicologico", False)),
-            "fisico": ft.Checkbox(label="Mostrar características físicas", value=visibility.get("fisico", False)),
+            "psicologico": ft.Checkbox(label="Mostrar traÃ§os pessoais", value=visibility.get("psicologico", False)),
+            "fisico": ft.Checkbox(label="Mostrar caracterÃ­sticas fÃ­sicas", value=visibility.get("fisico", False)),
         }
         interest_sliders = {
             key: ft.Slider(
@@ -1197,7 +1197,7 @@ def main(page: ft.Page):
                 label=label,
                 value=category_value(keys),
                 options=[
-                    ft.dropdown.Option("neutral", "Prefiro não responder"),
+                    ft.dropdown.Option("neutral", "Prefiro nÃ£o responder"),
                     *[ft.dropdown.Option(key, PHYSICAL_LABELS.get(key, key)) for key in keys],
                 ],
             )
@@ -1206,9 +1206,9 @@ def main(page: ft.Page):
                 label=PHYSICAL_LABELS.get(key, key),
                 value=toggle_value(key),
                 options=[
-                    ft.dropdown.Option("neutral", "Prefiro não responder"),
+                    ft.dropdown.Option("neutral", "Prefiro nÃ£o responder"),
                     ft.dropdown.Option("yes", "Sim"),
-                    ft.dropdown.Option("no", "Não"),
+                    ft.dropdown.Option("no", "NÃ£o"),
                 ],
             )
         filter_delta = {
@@ -1245,7 +1245,7 @@ def main(page: ft.Page):
                 height=140,
                 border_radius=18,
                 bgcolor=palette["surface_alt"],
-                alignment=ft.alignment.center,
+                alignment=ft.Alignment(0, 0),
                 content=ft.Icon(ft.Icons.ADD_A_PHOTO, size=48, color=palette["primary"]),
             )
 
@@ -1262,7 +1262,7 @@ def main(page: ft.Page):
                     return
                 selected_photo_path["value"] = files[0].path or ""
                 if not selected_photo_path["value"]:
-                    status.value = "Não consegui acessar o caminho da foto."
+                    status.value = "NÃ£o consegui acessar o caminho da foto."
                     return
                 updated = await api_request_async(
                     "PATCH",
@@ -1328,9 +1328,9 @@ def main(page: ft.Page):
                     },
                 )
                 state["profile"] = updated
-                status.value = "Características atualizadas."
+                status.value = "CaracterÃ­sticas atualizadas."
 
-            await run_guarded(event, work, status=status, busy_text="Salvando características...")
+            await run_guarded(event, work, status=status, busy_text="Salvando caracterÃ­sticas...")
 
         async def save_visibility(event: Any) -> None:
             async def work() -> None:
@@ -1406,10 +1406,10 @@ def main(page: ft.Page):
                                     ),
                                 ]
                             ),
-                            section_title("Sobre você"),
+                            section_title("Sobre vocÃª"),
                             display_name,
                             bio,
-                            section_title("Quem você quer conhecer"),
+                            section_title("Quem vocÃª quer conhecer"),
                             ft.Row(
                                 wrap=True,
                                 spacing=12,
@@ -1427,14 +1427,14 @@ def main(page: ft.Page):
                 panel(
                     ft.Column(
                         controls=[
-                            section_title("Suas características"),
+                            section_title("Suas caracterÃ­sticas"),
                             ft.Text(
-                                "Atualize as informações que ajudam outras pessoas a conhecerem você.",
+                                "Atualize as informaÃ§Ãµes que ajudam outras pessoas a conhecerem vocÃª.",
                                 color=palette["muted"],
                             ),
                             *physical_controls,
                             primary_button(
-                                "Salvar características",
+                                "Salvar caracterÃ­sticas",
                                 icon=ft.Icons.ACCESSIBILITY_NEW,
                                 on_click=save_physical,
                                 palette=palette,
@@ -1624,3 +1624,4 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     ft.run(main)
+
