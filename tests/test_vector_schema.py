@@ -66,7 +66,23 @@ class VectorSchemaTests(unittest.TestCase):
             query[QUERY_VECTOR_ORDER.index(("atracao", "olhos_castanhos"))],
             1.0,
         )
-        self.assertEqual(len(PHYSICAL_VECTOR_SCHEMA), 17)
+        self.assertEqual(len(PHYSICAL_VECTOR_SCHEMA), 27)
+        self.assertIn("olhos_cinzas", PHYSICAL_VECTOR_SCHEMA)
+        self.assertIn("cabelo_liso", PHYSICAL_VECTOR_SCHEMA)
+
+    def test_old_physical_keys_do_not_break_defaults(self) -> None:
+        profile = normalize_profile_vectors(
+            {
+                "fisico": {
+                    "cabelo_escuro": 1.0,
+                    "olhos_verdes_mel": 1.0,
+                }
+            }
+        )
+
+        self.assertNotIn("cabelo_escuro", profile["fisico"])
+        self.assertEqual(profile["fisico"]["cabelo_preto"], 0.5)
+        self.assertEqual(profile["fisico"]["olhos_mel_avela"], 0.5)
 
 
 if __name__ == "__main__":

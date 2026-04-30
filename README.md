@@ -5,13 +5,15 @@ App de namoro com onboarding por IA, perfil vetorial dinamico, vetores fisicos, 
 ## Rodar com um comando
 
 1. Copie `.env.example` para `.env` e preencha as chaves desejadas.
-2. Rode:
+2. No Windows, de dois cliques em `start_matchai.bat` ou rode:
 
 ```bash
 python scripts/run_matchai.py
 ```
 
-O launcher verifica o PostgreSQL, tenta iniciar `docker compose up -d postgres` quando Docker estiver disponivel, sobe a API FastAPI em background e abre o Flet.
+O launcher verifica o PostgreSQL, tenta iniciar `docker compose up -d postgres` quando Docker estiver disponivel, sobe a API FastAPI em background e abre o Flet. Se nao houver PostgreSQL nem Docker nesta maquina, ele roda em modo local com `matchai_local.db` para desenvolvimento.
+
+Evite abrir `python main.py` diretamente para uso normal, porque esse comando abre apenas a interface e nao inicia a API.
 
 ## Gerar executavel
 

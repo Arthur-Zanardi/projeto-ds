@@ -52,8 +52,13 @@ def can_connect(host: str, port: int, timeout: float = 1.0) -> bool:
 
 
 def ensure_postgres() -> None:
+    if os.getenv("MATCHAI_DB_BACKEND", "").lower() == "sqlite":
+        print("Usando banco local SQLite por MATCHAI_DB_BACKEND=sqlite.")
+        return
+
     host, port = database_host_port()
     if can_connect(host, port):
+        os.environ["MATCHAI_DB_BACKEND"] = "postgres"
         return
 
     docker = shutil.which("docker")
@@ -67,11 +72,20 @@ def ensure_postgres() -> None:
         )
         for _ in range(45):
             if can_connect(host, port):
+                os.environ["MATCHAI_DB_BACKEND"] = "postgres"
                 return
             time.sleep(1)
 
-    raise SystemExit(
-        "PostgreSQL nao esta acessivel. Inicie o Docker Desktop ou configure DATABASE_URL no .env."
+    if os.getenv("MATCHAI_REQUIRE_POSTGRES", "").lower() in {"1", "true", "yes"}:
+        raise SystemExit(
+            "PostgreSQL nao esta acessivel. Inicie o Docker Desktop ou configure DATABASE_URL no .env."
+        )
+
+    os.environ["MATCHAI_DB_BACKEND"] = "sqlite"
+    os.environ.setdefault("MATCHAI_SQLITE_PATH", str(APP_ROOT / "matchai_local.db"))
+    print(
+        "PostgreSQL/Docker nao encontrado. "
+        "Rodando em modo local com SQLite para desenvolvimento."
     )
 
 
@@ -107,7 +121,7 @@ def main() -> None:
     import main as flet_main
 
     try:
-        ft.app(target=flet_main.main)
+        ft.run(flet_main.main)
     finally:
         server.should_exit = True
         thread.join(timeout=5)

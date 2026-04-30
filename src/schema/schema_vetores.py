@@ -50,12 +50,22 @@ BASE_VECTOR_SCHEMA: dict[str, dict[str, float]] = {
 }
 
 PHYSICAL_VECTOR_SCHEMA: dict[str, float] = {
-    "olhos_azuis": 0.5,
+    "olhos_pretos": 0.5,
     "olhos_castanhos": 0.5,
-    "olhos_verdes_mel": 0.5,
-    "cabelo_escuro": 0.5,
-    "cabelo_claro_ruivo": 0.5,
-    "cabelo_cacheado_crespo": 0.5,
+    "olhos_mel_avela": 0.5,
+    "olhos_verdes": 0.5,
+    "olhos_azuis": 0.5,
+    "olhos_cinzas": 0.5,
+    "cabelo_preto": 0.5,
+    "cabelo_castanho": 0.5,
+    "cabelo_loiro": 0.5,
+    "cabelo_ruivo": 0.5,
+    "cabelo_colorido": 0.5,
+    "cabelo_liso": 0.5,
+    "cabelo_ondulado": 0.5,
+    "cabelo_cacheado": 0.5,
+    "cabelo_crespo": 0.5,
+    "cabelo_raspado_careca": 0.5,
     "oculos": 0.5,
     "tatuagens_piercings": 0.5,
     "estilo_esportivo": 0.5,
@@ -99,62 +109,72 @@ QUERY_VECTOR_ORDER: list[tuple[str, str]] = [
 INTEREST_LABELS: dict[str, str] = {
     "animes": "Animes",
     "filmes": "Filmes",
-    "series": "Series",
-    "livros_ficcao": "Livros de ficcao",
+    "series": "Séries",
+    "livros_ficcao": "Livros de ficção",
     "videogames": "Videogames",
     "jogos_tabuleiro": "Jogos de tabuleiro",
     "tecnologia": "Tecnologia",
     "academia": "Academia",
     "esportes": "Esportes",
     "futebol": "Futebol",
-    "dancas": "Dancas",
-    "musica": "Musica",
+    "dancas": "Danças",
+    "musica": "Música",
     "tocar_instrumentos": "Instrumentos",
     "fotografia": "Fotografia",
-    "culinaria": "Culinaria",
+    "culinaria": "Culinária",
     "idiomas": "Idiomas",
     "celebridades": "Cultura pop",
-    "historia": "Historia",
+    "historia": "História",
     "geografia": "Geografia",
-    "geopolitica": "Geopolitica",
+    "geopolitica": "Geopolítica",
     "astronomia": "Astronomia",
 }
 
 VALUE_LABELS: dict[str, str] = {
-    "ambicao_carreira": "Ambicao e carreira",
+    "ambicao_carreira": "Ambição e carreira",
     "conservadorismo": "Conservadorismo",
-    "espectro_politico": "Espectro politico",
-    "gestao_financeira": "Gestao financeira",
+    "espectro_politico": "Espectro político",
+    "gestao_financeira": "Gestão financeira",
     "religiosidade": "Religiosidade",
     "gosto_festas": "Gosto por festas",
 }
 
 PHYSICAL_LABELS: dict[str, str] = {
-    "olhos_azuis": "Olhos azuis",
+    "olhos_pretos": "Olhos pretos",
     "olhos_castanhos": "Olhos castanhos",
-    "olhos_verdes_mel": "Olhos verdes/mel",
-    "cabelo_escuro": "Cabelo escuro",
-    "cabelo_claro_ruivo": "Cabelo claro/ruivo",
-    "cabelo_cacheado_crespo": "Cabelo cacheado/crespo",
-    "oculos": "Oculos",
+    "olhos_mel_avela": "Olhos mel/avelã",
+    "olhos_verdes": "Olhos verdes",
+    "olhos_azuis": "Olhos azuis",
+    "olhos_cinzas": "Olhos cinzas",
+    "cabelo_preto": "Cabelo preto",
+    "cabelo_castanho": "Cabelo castanho",
+    "cabelo_loiro": "Cabelo loiro",
+    "cabelo_ruivo": "Cabelo ruivo",
+    "cabelo_colorido": "Cabelo colorido",
+    "cabelo_liso": "Cabelo liso",
+    "cabelo_ondulado": "Cabelo ondulado",
+    "cabelo_cacheado": "Cabelo cacheado",
+    "cabelo_crespo": "Cabelo crespo",
+    "cabelo_raspado_careca": "Cabelo raspado/careca",
+    "oculos": "Óculos",
     "tatuagens_piercings": "Tatuagens/piercings",
     "estilo_esportivo": "Estilo esportivo",
     "estilo_elegante": "Estilo elegante",
     "estilo_alternativo": "Estilo alternativo",
-    "altura_baixa": "Altura baixa",
-    "altura_media": "Altura media",
-    "altura_alta": "Altura alta",
+    "altura_baixa": "Baixa (até 1,60m)",
+    "altura_media": "Média (1,61m a 1,79m)",
+    "altura_alta": "Alta (a partir de 1,80m)",
     "corpo_magro": "Corpo magro",
-    "corpo_medio": "Corpo medio",
+    "corpo_medio": "Corpo médio",
     "corpo_forte": "Corpo forte",
 }
 
 GROUP_LABELS: dict[str, str] = {
-    "psicologico": "Perfil psicologico",
+    "psicologico": "Traços pessoais",
     "valores": "Valores",
     "interesses": "Interesses",
-    "fisico": "Caracteristicas fisicas",
-    "atracao": "Atracao fisica",
+    "fisico": "Características",
+    "atracao": "Preferências",
 }
 
 DEFAULT_VISIBLE_FIELDS: dict[str, bool] = {
@@ -163,6 +183,22 @@ DEFAULT_VISIBLE_FIELDS: dict[str, bool] = {
     "valores": False,
     "psicologico": False,
     "fisico": False,
+}
+
+GENDER_LABELS: dict[str, str] = {
+    "mulher": "Mulher",
+    "homem": "Homem",
+    "nao_binario": "Pessoa não binária",
+    "outro": "Outro",
+    "nao_informar": "Prefiro não responder",
+}
+
+INTERESTED_IN_LABELS: dict[str, str] = {
+    "mulheres": "Mulheres",
+    "homens": "Homens",
+    "nao_binarias": "Pessoas não binárias",
+    "todos": "Todos",
+    "nao_informar": "Prefiro não responder",
 }
 
 
@@ -393,12 +429,22 @@ class VetorInteresses(BaseModel):
 
 
 class VetorFisico(BaseModel):
-    olhos_azuis: float = Field(default=0.5)
+    olhos_pretos: float = Field(default=0.5)
     olhos_castanhos: float = Field(default=0.5)
-    olhos_verdes_mel: float = Field(default=0.5)
-    cabelo_escuro: float = Field(default=0.5)
-    cabelo_claro_ruivo: float = Field(default=0.5)
-    cabelo_cacheado_crespo: float = Field(default=0.5)
+    olhos_mel_avela: float = Field(default=0.5)
+    olhos_verdes: float = Field(default=0.5)
+    olhos_azuis: float = Field(default=0.5)
+    olhos_cinzas: float = Field(default=0.5)
+    cabelo_preto: float = Field(default=0.5)
+    cabelo_castanho: float = Field(default=0.5)
+    cabelo_loiro: float = Field(default=0.5)
+    cabelo_ruivo: float = Field(default=0.5)
+    cabelo_colorido: float = Field(default=0.5)
+    cabelo_liso: float = Field(default=0.5)
+    cabelo_ondulado: float = Field(default=0.5)
+    cabelo_cacheado: float = Field(default=0.5)
+    cabelo_crespo: float = Field(default=0.5)
+    cabelo_raspado_careca: float = Field(default=0.5)
     oculos: float = Field(default=0.5)
     tatuagens_piercings: float = Field(default=0.5)
     estilo_esportivo: float = Field(default=0.5)

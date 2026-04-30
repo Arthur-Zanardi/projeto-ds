@@ -16,6 +16,13 @@ from src.schema.schema_vetores import (
     top_physical_matches,
 )
 
+NEUTRAL_RELATIONSHIP_VALUES = {"", None, "nao_informar"}
+GENDER_TO_INTEREST = {
+    "mulher": "mulheres",
+    "homem": "homens",
+    "nao_binario": "nao_binarias",
+}
+
 
 def passes_value_filters(
     user_profile: dict[str, Any],
@@ -42,9 +49,24 @@ def passes_value_filters(
         if max_value is not None and candidate_value > float(max_value):
             return False, f"{key} acima do filtro definido."
         if max_delta is not None and abs(candidate_value - user_value) > float(max_delta):
-            return False, f"{key} tem diferenca maior que o limite."
+            return False, f"{key} tem diferença maior que o limite."
 
     return True, None
+
+
+def relationship_compatible(
+    user_profile: dict[str, Any],
+    candidate_profile: dict[str, Any],
+) -> bool:
+    user_gender = user_profile.get("gender_identity") or "nao_informar"
+    user_interest = user_profile.get("interested_in") or "nao_informar"
+    candidate_gender = candidate_profile.get("gender_identity") or "nao_informar"
+    candidate_interest = candidate_profile.get("interested_in") or "nao_informar"
+
+    return _interest_accepts_gender(user_interest, candidate_gender) and _interest_accepts_gender(
+        candidate_interest,
+        user_gender,
+    )
 
 
 def compatibility_breakdown(
@@ -98,17 +120,17 @@ def explain_match(
         fragments.append(f"interesses fortes em {readable}")
     if physical:
         readable = ", ".join(item["label"].lower() for item in physical)
-        fragments.append(f"sinais de atracao por {readable}")
+        fragments.append(f"preferências em comum, como {readable}")
 
     if fragments:
-        return f"{candidate_name} combina com voce por " + " e ".join(fragments) + "."
+        return f"{candidate_name} combina com você por " + " e ".join(fragments) + "."
 
     values = _closest_values(user_vectors, candidate_vectors, limit=2)
     if values:
         readable = ", ".join(VALUE_LABELS.get(key, key).lower() for key, _ in values)
         return f"{candidate_name} parece ter uma sintonia boa em {readable}."
 
-    return f"{candidate_name} apareceu por proximidade vetorial geral entre os perfis."
+    return f"{candidate_name} apareceu por uma boa afinidade geral com o seu perfil."
 
 
 def public_match_profile(
@@ -130,7 +152,7 @@ def fallback_icebreaker(
     if overlaps:
         key, _ = overlaps[0]
         label = INTEREST_LABELS.get(key, key).lower()
-        return f"Puxa assunto perguntando para {candidate_name} qual foi a experiencia mais marcante dela com {label}."
+        return f"Puxa assunto perguntando para {candidate_name} qual foi a experiência mais marcante dela com {label}."
 
     physical = top_physical_matches(user_vectors, candidate_vectors, limit=1)
     if physical:
@@ -143,7 +165,7 @@ def fallback_icebreaker(
         label = VALUE_LABELS.get(key, key).lower()
         return f"Comece perguntando como {candidate_name} enxerga {label} no dia a dia."
 
-    return f"Pergunte para {candidate_name} que tipo de conexao faz uma conversa valer a pena."
+    return f"Pergunte para {candidate_name} que tipo de conexão faz uma conversa valer a pena."
 
 
 def generate_icebreaker(
@@ -215,3 +237,14 @@ def _mean_pair_similarity(
         else:
             scores.append(1 - abs(preference - attribute))
     return sum(scores) / len(scores)
+
+
+def _interest_accepts_gender(interest: str | None, gender: str | None) -> bool:
+    if interest in NEUTRAL_RELATIONSHIP_VALUES or interest == "todos":
+        return True
+    if gender in NEUTRAL_RELATIONSHIP_VALUES:
+        return True
+    expected = GENDER_TO_INTEREST.get(gender or "")
+    if expected is None:
+        return True
+    return interest == expected

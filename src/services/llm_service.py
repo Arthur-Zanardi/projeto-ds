@@ -17,7 +17,7 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 def _client():
     if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY nao configurada.")
+        raise RuntimeError("GROQ_API_KEY não configurada.")
     from groq import Groq
 
     return Groq(api_key=GROQ_API_KEY)
@@ -32,10 +32,10 @@ def gerar_resposta_ia(
             {
                 "role": "system",
                 "content": (
-                    "Voce e a IA de onboarding do MatchAI. Converse de forma acolhedora, "
-                    "curiosa e objetiva para entender gostos, valores, rotina, atracao "
-                    "fisica, visao de mundo e estilo de relacionamento do usuario. Faca no maximo uma "
-                    "pergunta por resposta e responda em ate 3 linhas."
+                    "Você é a IA de onboarding do MatchAI. Converse de forma acolhedora, "
+                    "curiosa e objetiva para entender gostos, valores, rotina, atração "
+                    "física, visão de mundo e estilo de relacionamento do usuário. Faça no máximo uma "
+                    "pergunta por resposta e responda em até 3 linhas."
                 ),
             }
         ]
@@ -56,7 +56,7 @@ def gerar_resposta_ia(
     except Exception as exc:
         return (
             "Quero te conhecer melhor. Me conta um pouco sobre sua rotina, seus "
-            f"interesses e o tipo de conexao que voce procura. ({exc})"
+            f"interesses e o tipo de conexão que você procura. ({exc})"
         )
 
 
@@ -64,97 +64,19 @@ def extrair_vetores_da_conversa(historico_conversa: str) -> dict[str, dict[str, 
     if not historico_conversa.strip():
         return default_profile_vectors()
 
-    prompt_sistema = """
-Voce e um especialista em analise comportamental para um aplicativo de relacionamentos.
-Leia a conversa do usuario e extraia um perfil vetorial JSON.
+    schema_example = json.dumps(default_profile_vectors(), ensure_ascii=False, indent=2)
+    prompt_sistema = f"""
+Você é um especialista em análise comportamental para um aplicativo de relacionamentos.
+Leia a conversa do usuário e extraia um JSON de perfil.
 
 Regras:
-- Use apenas evidencias ditas pelo usuario.
-- Se nao houver indicios claros, mantenha 0.5.
+- Use apenas evidências ditas pelo usuário.
+- Se não houver indícios claros, mantenha 0.5.
 - Todos os valores devem ficar entre 0.0 e 1.0.
-- O grupo "fisico" representa caracteristicas reais do usuario e NAO deve ser inferido pela conversa; mantenha 0.5.
-- O grupo "atracao" representa preferencias fisicas que o usuario disse gostar.
-- Retorne apenas JSON valido com esta estrutura:
-{
-  "psicologico": {
-    "extroversao": 0.5,
-    "abertura_experiencias": 0.5,
-    "romantismo_afeto": 0.5,
-    "ritmo_vida": 0.5,
-    "logica_vs_emocao": 0.5,
-    "resolucao_conflitos": 0.5,
-    "competitividade_cooperacao": 0.5
-  },
-  "valores": {
-    "ambicao_carreira": 0.5,
-    "conservadorismo": 0.5,
-    "espectro_politico": 0.5,
-    "gestao_financeira": 0.5,
-    "religiosidade": 0.5,
-    "gosto_festas": 0.5
-  },
-  "interesses": {
-    "animes": 0.5,
-    "filmes": 0.5,
-    "series": 0.5,
-    "livros_ficcao": 0.5,
-    "videogames": 0.5,
-    "jogos_tabuleiro": 0.5,
-    "tecnologia": 0.5,
-    "academia": 0.5,
-    "esportes": 0.5,
-    "futebol": 0.5,
-    "dancas": 0.5,
-    "musica": 0.5,
-    "tocar_instrumentos": 0.5,
-    "fotografia": 0.5,
-    "culinaria": 0.5,
-    "idiomas": 0.5,
-    "celebridades": 0.5,
-    "historia": 0.5,
-    "geografia": 0.5,
-    "geopolitica": 0.5,
-    "astronomia": 0.5
-  },
-  "fisico": {
-    "olhos_azuis": 0.5,
-    "olhos_castanhos": 0.5,
-    "olhos_verdes_mel": 0.5,
-    "cabelo_escuro": 0.5,
-    "cabelo_claro_ruivo": 0.5,
-    "cabelo_cacheado_crespo": 0.5,
-    "oculos": 0.5,
-    "tatuagens_piercings": 0.5,
-    "estilo_esportivo": 0.5,
-    "estilo_elegante": 0.5,
-    "estilo_alternativo": 0.5,
-    "altura_baixa": 0.5,
-    "altura_media": 0.5,
-    "altura_alta": 0.5,
-    "corpo_magro": 0.5,
-    "corpo_medio": 0.5,
-    "corpo_forte": 0.5
-  },
-  "atracao": {
-    "olhos_azuis": 0.5,
-    "olhos_castanhos": 0.5,
-    "olhos_verdes_mel": 0.5,
-    "cabelo_escuro": 0.5,
-    "cabelo_claro_ruivo": 0.5,
-    "cabelo_cacheado_crespo": 0.5,
-    "oculos": 0.5,
-    "tatuagens_piercings": 0.5,
-    "estilo_esportivo": 0.5,
-    "estilo_elegante": 0.5,
-    "estilo_alternativo": 0.5,
-    "altura_baixa": 0.5,
-    "altura_media": 0.5,
-    "altura_alta": 0.5,
-    "corpo_magro": 0.5,
-    "corpo_medio": 0.5,
-    "corpo_forte": 0.5
-  }
-}
+- O grupo "fisico" representa características reais do usuário e NÃO deve ser inferido pela conversa; mantenha 0.5.
+- O grupo "atracao" representa preferências físicas que o usuário disse gostar.
+- Retorne apenas JSON válido com esta estrutura:
+{schema_example}
 """
 
     try:
@@ -176,7 +98,7 @@ Regras:
         texto_json = completion.choices[0].message.content
         return normalize_profile_vectors(json.loads(texto_json))
     except Exception as exc:
-        print(f"Erro ao extrair vetores: {exc}")
+        print(f"Erro ao extrair perfil: {exc}")
         return default_profile_vectors()
 
 
@@ -186,10 +108,10 @@ def gerar_sugestao_assunto_ia(
     nome_match: str,
 ) -> str:
     prompt = (
-        "Crie uma unica sugestao curta de assunto inicial para uma conversa de match. "
-        "Use os perfis vetoriais cruzados, evite parecer robotico e escreva em portugues.\n"
+        "Crie uma única sugestão curta de assunto inicial para uma conversa de match. "
+        "Use os perfis cruzados, evite parecer robótico e escreva em português.\n"
         f"Nome do match: {nome_match}\n"
-        f"Perfil usuario: {json.dumps(normalize_profile_vectors(perfil_usuario), ensure_ascii=False)}\n"
+        f"Perfil usuário: {json.dumps(normalize_profile_vectors(perfil_usuario), ensure_ascii=False)}\n"
         f"Perfil match: {json.dumps(normalize_profile_vectors(perfil_match), ensure_ascii=False)}"
     )
     try:
@@ -198,7 +120,7 @@ def gerar_sugestao_assunto_ia(
             messages=[
                 {
                     "role": "system",
-                    "content": "Voce ajuda a iniciar conversas naturais em apps de namoro.",
+                    "content": "Você ajuda a iniciar conversas naturais em apps de namoro.",
                 },
                 {"role": "user", "content": prompt},
             ],

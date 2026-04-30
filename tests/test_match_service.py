@@ -7,6 +7,7 @@ from src.services.match_service import (
     compatibility_breakdown,
     fallback_icebreaker,
     passes_value_filters,
+    relationship_compatible,
 )
 
 
@@ -49,18 +50,18 @@ class MatchServiceTests(unittest.TestCase):
 
         suggestion = fallback_icebreaker(user_profile, candidate_profile, "Luiza")
 
-        self.assertIn("musica", suggestion.lower())
+        self.assertIn("música", suggestion.lower())
         self.assertIn("Luiza", suggestion)
 
     def test_compatibility_uses_crossed_physical_vectors(self) -> None:
         user_profile = {
             "atracao": {"olhos_azuis": 1.0},
-            "fisico": {"cabelo_escuro": 1.0},
+            "fisico": {"cabelo_preto": 1.0},
             "interesses": {"musica": 0.8},
         }
         candidate_profile = {
             "fisico": {"olhos_azuis": 1.0},
-            "atracao": {"cabelo_escuro": 1.0},
+            "atracao": {"cabelo_preto": 1.0},
             "interesses": {"musica": 0.8},
         }
 
@@ -81,6 +82,18 @@ class MatchServiceTests(unittest.TestCase):
 
         self.assertEqual(merged["fisico"]["olhos_azuis"], 1.0)
         self.assertEqual(merged["atracao"]["olhos_castanhos"], 1.0)
+
+    def test_relationship_filter_blocks_when_interests_do_not_match(self) -> None:
+        user_profile = {"gender_identity": "homem", "interested_in": "mulheres"}
+        candidate_profile = {"gender_identity": "homem", "interested_in": "mulheres"}
+
+        self.assertFalse(relationship_compatible(user_profile, candidate_profile))
+
+    def test_relationship_filter_allows_neutral_or_everyone(self) -> None:
+        user_profile = {"gender_identity": "homem", "interested_in": "todos"}
+        candidate_profile = {"gender_identity": "mulher", "interested_in": "nao_informar"}
+
+        self.assertTrue(relationship_compatible(user_profile, candidate_profile))
 
 
 if __name__ == "__main__":

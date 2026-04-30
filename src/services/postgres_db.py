@@ -78,6 +78,8 @@ def init_database() -> None:
                     interests_override JSONB NOT NULL DEFAULT '{}'::jsonb,
                     photo_path TEXT NOT NULL DEFAULT '',
                     physical_questionnaire_completed BOOLEAN NOT NULL DEFAULT false,
+                    gender_identity TEXT NOT NULL DEFAULT 'nao_informar',
+                    interested_in TEXT NOT NULL DEFAULT 'nao_informar',
                     accessibility_mode BOOLEAN NOT NULL DEFAULT false,
                     ui_font_scale DOUBLE PRECISION NOT NULL DEFAULT 1.0,
                     theme_mode TEXT NOT NULL DEFAULT 'light',
@@ -91,10 +93,22 @@ def init_database() -> None:
                 "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS physical_questionnaire_completed BOOLEAN NOT NULL DEFAULT false"
             )
             cur.execute(
+                "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gender_identity TEXT NOT NULL DEFAULT 'nao_informar'"
+            )
+            cur.execute(
+                "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS interested_in TEXT NOT NULL DEFAULT 'nao_informar'"
+            )
+            cur.execute(
                 "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS accessibility_mode BOOLEAN NOT NULL DEFAULT false"
             )
             cur.execute(
                 "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ui_font_scale DOUBLE PRECISION NOT NULL DEFAULT 1.0"
+            )
+            cur.execute(
+                "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS theme_mode TEXT NOT NULL DEFAULT 'light'"
+            )
+            cur.execute(
+                "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS chat_font_scale DOUBLE PRECISION NOT NULL DEFAULT 1.0"
             )
             cur.execute(
                 """
@@ -269,7 +283,7 @@ def get_profile(user_id: str) -> dict[str, Any]:
         with conn.cursor() as cur:
             user = get_user_by_id(user_id)
             if not user:
-                raise ValueError("Usuario nao encontrado.")
+                raise ValueError("Usuário não encontrado.")
             _ensure_profile(cur, user_id, user["display_name"])
             cur.execute("SELECT * FROM profiles WHERE user_id = %s", (user_id,))
             row = dict(cur.fetchone())
@@ -290,8 +304,11 @@ def _profile_row(row: dict[str, Any]) -> dict[str, Any]:
         "interests_override": interests_override,
         "photo_path": row.get("photo_path") or "",
         "physical_questionnaire_completed": bool(row.get("physical_questionnaire_completed", False)),
+        "gender_identity": row.get("gender_identity") or "nao_informar",
+        "interested_in": row.get("interested_in") or "nao_informar",
         "accessibility_mode": bool(row.get("accessibility_mode", False)),
         "ui_font_scale": float(row.get("ui_font_scale") or 1.0),
+        "chat_font_scale": float(row.get("chat_font_scale") or 1.0),
         "top_interests_summary": top_interests_summary(vector_json),
     }
 
@@ -308,6 +325,8 @@ def update_profile(user_id: str, updates: dict[str, Any]) -> dict[str, Any]:
         "interests_override",
         "photo_path",
         "physical_questionnaire_completed",
+        "gender_identity",
+        "interested_in",
     }
     fields = {key: value for key, value in updates.items() if key in allowed and value is not None}
     if not fields:
@@ -680,6 +699,8 @@ def delete_profile_data(user_id: str) -> dict[str, str]:
                     interests_override = '{}'::jsonb,
                     photo_path = '',
                     physical_questionnaire_completed = false,
+                    gender_identity = 'nao_informar',
+                    interested_in = 'nao_informar',
                     updated_at = now()
                 WHERE user_id = %s
                 """,
@@ -699,7 +720,7 @@ def migrate_sqlite_to_postgres(
 ) -> dict[str, Any]:
     db_path = Path(sqlite_path)
     if not db_path.exists():
-        raise FileNotFoundError(f"SQLite nao encontrado: {sqlite_path}")
+        raise FileNotFoundError(f"SQLite não encontrado: {sqlite_path}")
 
     init_database()
     user = get_user_by_email(legacy_email)

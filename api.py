@@ -17,7 +17,7 @@ from src.schema.schema_vetores import (
     normalize_profile_vectors,
     top_interests_summary,
 )
-from src.services import postgres_db as db
+from src.services import db
 from src.services.auth_service import (
     build_google_authorization_url,
     create_access_token,
@@ -40,6 +40,7 @@ from src.services.match_service import (
     generate_icebreaker,
     passes_value_filters,
     public_match_profile,
+    relationship_compatible,
 )
 
 
@@ -73,6 +74,8 @@ class MensagemUsuario(BaseModel):
 class ProfileUpdate(BaseModel):
     display_name: str | None = None
     bio: str | None = None
+    gender_identity: str | None = None
+    interested_in: str | None = None
     theme_mode: str | None = Field(default=None, pattern="^(light|dark)$")
     chat_font_scale: float | None = Field(default=None, ge=0.8, le=1.6)
     ui_font_scale: float | None = Field(default=None, ge=0.8, le=1.8)
@@ -85,6 +88,8 @@ class InterestsUpdate(BaseModel):
 
 class PhysicalUpdate(BaseModel):
     fisico: dict[str, float]
+    gender_identity: str | None = None
+    interested_in: str | None = None
 
 
 class PhotoUpdate(BaseModel):
@@ -121,7 +126,7 @@ def current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict[str, Any]:
     if credentials is None:
-        raise HTTPException(status_code=401, detail="Autenticacao obrigatoria.")
+        raise HTTPException(status_code=401, detail="Autenticação obrigatória.")
 
     try:
         payload = decode_access_token(credentials.credentials)
@@ -130,7 +135,7 @@ def current_user(
 
     user = db.get_user_by_id(payload["sub"])
     if not user:
-        raise HTTPException(status_code=401, detail="Usuario nao encontrado.")
+        raise HTTPException(status_code=401, detail="Usuário não encontrado.")
     return user
 
 
@@ -183,6 +188,8 @@ def _candidate_profile(candidate_id: str) -> dict[str, Any] | None:
             "nome": profile.get("display_name") or user["display_name"],
             "bio": profile.get("bio", ""),
             "photo_path": profile.get("photo_path", ""),
+            "gender_identity": profile.get("gender_identity", "nao_informar"),
+            "interested_in": profile.get("interested_in", "nao_informar"),
             "profile_json": profile.get("vector_json") or profile.get("profile_json"),
             "visible_fields": profile.get("visible_fields", DEFAULT_VISIBLE_FIELDS),
         }
@@ -200,18 +207,18 @@ def _sync_profile_to_vector_store(user: dict[str, Any], profile: dict[str, Any])
 
 @app.get("/")
 def read_root():
-    return {"mensagem": "API do MatchAI esta pronta."}
+    return {"mensagem": "API do MatchAI está pronta."}
 
 
 @app.post("/auth/register")
 def register(payload: AuthRequest):
     email = payload.email.lower().strip()
     if "@" not in email:
-        raise HTTPException(status_code=400, detail="E-mail invalido.")
+        raise HTTPException(status_code=400, detail="E-mail inválido.")
     if len(payload.password) < 6:
         raise HTTPException(status_code=400, detail="Senha deve ter pelo menos 6 caracteres.")
     if db.get_user_by_email(email):
-        raise HTTPException(status_code=409, detail="E-mail ja cadastrado.")
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado.")
 
     user = db.create_user(
         email=email,
@@ -225,7 +232,7 @@ def register(payload: AuthRequest):
 def login(payload: AuthRequest):
     user = db.get_user_by_email(payload.email)
     if not user or not verify_password(payload.password, user.get("password_hash")):
-        raise HTTPException(status_code=401, detail="E-mail ou senha invalidos.")
+        raise HTTPException(status_code=401, detail="E-mail ou senha inválidos.")
     return _auth_payload(user)
 
 
@@ -234,7 +241,7 @@ def google_start():
     if not google_oauth_configured():
         return {
             "enabled": False,
-            "mensagem": "Google OAuth nao configurado no .env.",
+            "mensagem": "Google OAuth não configurado no .env.",
         }
 
     state = secrets.token_urlsafe(24)
@@ -256,11 +263,11 @@ def google_callback(
         return "<h1>MatchAI</h1><p>Estado OAuth ausente.</p>"
     if error:
         db.fail_oauth_session(state, error)
-        return "<h1>MatchAI</h1><p>Login cancelado. Voce pode fechar esta janela.</p>"
+        return "<h1>MatchAI</h1><p>Login cancelado. Você pode fechar esta janela.</p>"
 
     try:
         if not code:
-            raise RuntimeError("Codigo OAuth ausente.")
+            raise RuntimeError("Código OAuth ausente.")
         google_user = exchange_google_code(code)
         user = db.upsert_google_user(
             email=google_user["email"],
@@ -277,14 +284,14 @@ def google_callback(
         db.fail_oauth_session(state, str(exc))
         return f"<h1>MatchAI</h1><p>Erro no login: {exc}</p>"
 
-    return "<h1>MatchAI</h1><p>Login concluido. Voce pode voltar ao app.</p>"
+    return "<h1>MatchAI</h1><p>Login concluído. Você pode voltar ao app.</p>"
 
 
 @app.get("/auth/google/status/{state}")
 def google_status(state: str):
     session = db.get_oauth_session(state)
     if not session:
-        raise HTTPException(status_code=404, detail="Sessao OAuth nao encontrada.")
+        raise HTTPException(status_code=404, detail="Sessão OAuth não encontrada.")
     if session.get("error"):
         return {"status": "error", "error": session["error"]}
     if session.get("token"):
@@ -383,6 +390,16 @@ def update_physical_profile(
     user: dict[str, Any] = Depends(current_user),
 ):
     saved = db.save_physical_profile(user["id"], payload.fisico)
+    relationship_updates = {
+        key: value
+        for key, value in {
+            "gender_identity": payload.gender_identity,
+            "interested_in": payload.interested_in,
+        }.items()
+        if value is not None
+    }
+    if relationship_updates:
+        saved = db.update_profile(user["id"], relationship_updates)
     _sync_profile_to_vector_store(user, saved)
     return saved
 
@@ -442,7 +459,7 @@ def calcular_match_final(
     readiness = db.get_profile_readiness(user["id"])
     if not readiness["ready"]:
         missing_labels = {
-            "questionario_fisico": "preencher o questionario fisico",
+            "questionario_fisico": "preencher suas características",
             "conversa_ia": "conversar um pouco mais com a IA",
         }
         faltando = ", ".join(missing_labels.get(item, item) for item in readiness["missing"])
@@ -460,16 +477,26 @@ def calcular_match_final(
     approved: list[dict[str, Any]] = []
 
     for candidate in raw_candidates:
-        candidate_profile = normalize_profile_vectors(candidate.get("profile_json"))
+        candidate_full = _candidate_profile(candidate["id"]) or candidate
+        if not relationship_compatible(profile, candidate_full):
+            continue
+
+        candidate_profile = normalize_profile_vectors(
+            candidate_full.get("profile_json") or candidate.get("profile_json")
+        )
+        candidate_name = candidate_full.get("nome") or candidate.get("nome", "Match")
         ok, _reason = passes_value_filters(user_vector_profile, candidate_profile, filtros)
         if not ok:
             continue
 
         breakdown = compatibility_breakdown(user_vector_profile, candidate_profile)
-        explanation = explain_match(user_vector_profile, candidate_profile, candidate["nome"])
+        explanation = explain_match(user_vector_profile, candidate_profile, candidate_name)
         approved.append(
             {
                 **candidate,
+                "nome": candidate_name,
+                "bio": candidate_full.get("bio", candidate.get("bio", "")),
+                "photo_path": candidate_full.get("photo_path", candidate.get("photo_path", "")),
                 "afinidade_numero": breakdown["overall_affinity"],
                 "afinidade": f"{breakdown['overall_affinity']}%",
                 "distancia_chroma": candidate["distancia_matematica"],
@@ -519,11 +546,11 @@ def get_match_profile(
 ):
     match_row = db.get_match(match_id, user["id"])
     if not match_row:
-        raise HTTPException(status_code=404, detail="Match nao encontrado.")
+        raise HTTPException(status_code=404, detail="Match não encontrado.")
 
     candidate = _candidate_profile(match_row["matched_user_id"])
     if not candidate:
-        raise HTTPException(status_code=404, detail="Perfil do match nao encontrado.")
+        raise HTTPException(status_code=404, detail="Perfil do match não encontrado.")
 
     public_profile = public_match_profile(
         candidate.get("profile_json", {}),
@@ -555,12 +582,12 @@ def get_icebreaker(
 ):
     match_row = db.get_match(match_id, user["id"])
     if not match_row:
-        raise HTTPException(status_code=404, detail="Match nao encontrado.")
+        raise HTTPException(status_code=404, detail="Match não encontrado.")
 
     user_profile = db.get_profile(user["id"])
     candidate = _candidate_profile(match_row["matched_user_id"])
     if not candidate:
-        raise HTTPException(status_code=404, detail="Perfil do match nao encontrado.")
+        raise HTTPException(status_code=404, detail="Perfil do match não encontrado.")
 
     sugestao = generate_icebreaker(
         user_profile.get("vector_json") or user_profile.get("profile_json"),
@@ -577,7 +604,7 @@ def get_match_messages(
 ):
     match_row = db.get_match(match_id, user["id"])
     if not match_row:
-        raise HTTPException(status_code=404, detail="Match nao encontrado.")
+        raise HTTPException(status_code=404, detail="Match não encontrado.")
     return {"messages": db.list_match_messages(match_id)}
 
 
@@ -589,7 +616,7 @@ def post_match_message(
 ):
     match_row = db.get_match(match_id, user["id"])
     if not match_row:
-        raise HTTPException(status_code=404, detail="Match nao encontrado.")
+        raise HTTPException(status_code=404, detail="Match não encontrado.")
     mensagem = payload.mensagem.strip()
     if not mensagem:
         raise HTTPException(status_code=400, detail="Mensagem vazia.")
