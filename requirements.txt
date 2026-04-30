@@ -5,5 +5,6 @@ groq==1.1.1
 psycopg[binary]>=3.2.0
 pydantic==2.12.5
 python-dotenv==1.2.2
+pyinstaller>=6.11.0
 requests>=2.32.0
 uvicorn[standard]>=0.32.0

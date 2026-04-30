@@ -33,8 +33,8 @@ def gerar_resposta_ia(
                 "role": "system",
                 "content": (
                     "Voce e a IA de onboarding do MatchAI. Converse de forma acolhedora, "
-                    "curiosa e objetiva para entender gostos, valores, rotina, visao de "
-                    "mundo e estilo de relacionamento do usuario. Faca no maximo uma "
+                    "curiosa e objetiva para entender gostos, valores, rotina, atracao "
+                    "fisica, visao de mundo e estilo de relacionamento do usuario. Faca no maximo uma "
                     "pergunta por resposta e responda em ate 3 linhas."
                 ),
             }
@@ -72,6 +72,8 @@ Regras:
 - Use apenas evidencias ditas pelo usuario.
 - Se nao houver indicios claros, mantenha 0.5.
 - Todos os valores devem ficar entre 0.0 e 1.0.
+- O grupo "fisico" representa caracteristicas reais do usuario e NAO deve ser inferido pela conversa; mantenha 0.5.
+- O grupo "atracao" representa preferencias fisicas que o usuario disse gostar.
 - Retorne apenas JSON valido com esta estrutura:
 {
   "psicologico": {
@@ -113,6 +115,44 @@ Regras:
     "geografia": 0.5,
     "geopolitica": 0.5,
     "astronomia": 0.5
+  },
+  "fisico": {
+    "olhos_azuis": 0.5,
+    "olhos_castanhos": 0.5,
+    "olhos_verdes_mel": 0.5,
+    "cabelo_escuro": 0.5,
+    "cabelo_claro_ruivo": 0.5,
+    "cabelo_cacheado_crespo": 0.5,
+    "oculos": 0.5,
+    "tatuagens_piercings": 0.5,
+    "estilo_esportivo": 0.5,
+    "estilo_elegante": 0.5,
+    "estilo_alternativo": 0.5,
+    "altura_baixa": 0.5,
+    "altura_media": 0.5,
+    "altura_alta": 0.5,
+    "corpo_magro": 0.5,
+    "corpo_medio": 0.5,
+    "corpo_forte": 0.5
+  },
+  "atracao": {
+    "olhos_azuis": 0.5,
+    "olhos_castanhos": 0.5,
+    "olhos_verdes_mel": 0.5,
+    "cabelo_escuro": 0.5,
+    "cabelo_claro_ruivo": 0.5,
+    "cabelo_cacheado_crespo": 0.5,
+    "oculos": 0.5,
+    "tatuagens_piercings": 0.5,
+    "estilo_esportivo": 0.5,
+    "estilo_elegante": 0.5,
+    "estilo_alternativo": 0.5,
+    "altura_baixa": 0.5,
+    "altura_media": 0.5,
+    "altura_alta": 0.5,
+    "corpo_magro": 0.5,
+    "corpo_medio": 0.5,
+    "corpo_forte": 0.5
   }
 }
 """

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from src.services.match_service import fallback_icebreaker, passes_value_filters
+from src.schema.schema_vetores import merge_extracted_profile
+from src.services.match_service import (
+    compatibility_breakdown,
+    fallback_icebreaker,
+    passes_value_filters,
+)
 
 
 class MatchServiceTests(unittest.TestCase):
@@ -46,6 +51,36 @@ class MatchServiceTests(unittest.TestCase):
 
         self.assertIn("musica", suggestion.lower())
         self.assertIn("Luiza", suggestion)
+
+    def test_compatibility_uses_crossed_physical_vectors(self) -> None:
+        user_profile = {
+            "atracao": {"olhos_azuis": 1.0},
+            "fisico": {"cabelo_escuro": 1.0},
+            "interesses": {"musica": 0.8},
+        }
+        candidate_profile = {
+            "fisico": {"olhos_azuis": 1.0},
+            "atracao": {"cabelo_escuro": 1.0},
+            "interesses": {"musica": 0.8},
+        }
+
+        breakdown = compatibility_breakdown(user_profile, candidate_profile)
+
+        self.assertGreaterEqual(breakdown["physical_similarity"], 50.0)
+        self.assertGreaterEqual(breakdown["reciprocal_attraction"], 50.0)
+        self.assertGreaterEqual(breakdown["overall_affinity"], 50.0)
+
+    def test_extracted_profile_preserves_physical_questionnaire(self) -> None:
+        current = {"fisico": {"olhos_azuis": 1.0}}
+        extracted = {
+            "fisico": {"olhos_azuis": 0.0},
+            "atracao": {"olhos_castanhos": 1.0},
+        }
+
+        merged = merge_extracted_profile(current, extracted)
+
+        self.assertEqual(merged["fisico"]["olhos_azuis"], 1.0)
+        self.assertEqual(merged["atracao"]["olhos_castanhos"], 1.0)
 
 
 if __name__ == "__main__":

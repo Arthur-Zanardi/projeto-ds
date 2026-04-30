@@ -4,10 +4,10 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from src.schema.schema_vetores import flatten_profile_vectors, normalize_profile_vectors
+from src.schema.schema_vetores import flatten_storage_vectors, normalize_profile_vectors
 
 
-COLLECTION_NAME = "perfis_matchai"
+COLLECTION_NAME = "perfis_matchai_v2"
 CHROMA_PATH = "./banco_vetorial"
 
 
@@ -33,7 +33,7 @@ def salvar_perfil_usuario(
     bio: str = "",
 ) -> list[float]:
     profile_json = normalize_profile_vectors(dados_extraidos_ia)
-    vetor_usuario = flatten_profile_vectors(profile_json)
+    vetor_usuario = flatten_storage_vectors(profile_json)
     collection = _collection()
     if collection is None:
         return vetor_usuario
@@ -128,7 +128,7 @@ def popular_banco_mock() -> None:
         (
             "user_maria",
             "Maria",
-            "Designer, leitora de fantasia e parceira para jogos, academia e futebol.",
+            "Designer, leitora de fantasia, olhos azuis e parceira para jogos, academia e futebol.",
             {
                 "psicologico": {
                     "extroversao": 0.6,
@@ -170,12 +170,50 @@ def popular_banco_mock() -> None:
                     "geopolitica": 0.5,
                     "astronomia": 0.5,
                 },
+                "fisico": {
+                    "olhos_azuis": 1.0,
+                    "olhos_castanhos": 0.0,
+                    "olhos_verdes_mel": 0.0,
+                    "cabelo_escuro": 0.2,
+                    "cabelo_claro_ruivo": 0.8,
+                    "cabelo_cacheado_crespo": 0.4,
+                    "oculos": 0.2,
+                    "tatuagens_piercings": 0.4,
+                    "estilo_esportivo": 0.8,
+                    "estilo_elegante": 0.5,
+                    "estilo_alternativo": 0.4,
+                    "altura_baixa": 0.0,
+                    "altura_media": 1.0,
+                    "altura_alta": 0.0,
+                    "corpo_magro": 0.2,
+                    "corpo_medio": 0.7,
+                    "corpo_forte": 0.6,
+                },
+                "atracao": {
+                    "olhos_azuis": 0.5,
+                    "olhos_castanhos": 0.7,
+                    "olhos_verdes_mel": 0.8,
+                    "cabelo_escuro": 0.8,
+                    "cabelo_claro_ruivo": 0.4,
+                    "cabelo_cacheado_crespo": 0.7,
+                    "oculos": 0.6,
+                    "tatuagens_piercings": 0.5,
+                    "estilo_esportivo": 0.7,
+                    "estilo_elegante": 0.6,
+                    "estilo_alternativo": 0.4,
+                    "altura_baixa": 0.3,
+                    "altura_media": 0.8,
+                    "altura_alta": 0.7,
+                    "corpo_magro": 0.5,
+                    "corpo_medio": 0.8,
+                    "corpo_forte": 0.7,
+                },
             },
         ),
         (
             "user_luiza",
             "Luiza",
-            "Musica, astronomia, conversas profundas e rotina mais tranquila.",
+            "Musica, astronomia, cabelo escuro, oculos e conversas profundas.",
             {
                 "psicologico": {
                     "extroversao": 0.35,
@@ -217,12 +255,50 @@ def popular_banco_mock() -> None:
                     "geopolitica": 0.7,
                     "astronomia": 0.95,
                 },
+                "fisico": {
+                    "olhos_azuis": 0.0,
+                    "olhos_castanhos": 0.7,
+                    "olhos_verdes_mel": 0.3,
+                    "cabelo_escuro": 1.0,
+                    "cabelo_claro_ruivo": 0.0,
+                    "cabelo_cacheado_crespo": 0.8,
+                    "oculos": 1.0,
+                    "tatuagens_piercings": 0.3,
+                    "estilo_esportivo": 0.3,
+                    "estilo_elegante": 0.6,
+                    "estilo_alternativo": 0.8,
+                    "altura_baixa": 0.2,
+                    "altura_media": 1.0,
+                    "altura_alta": 0.0,
+                    "corpo_magro": 0.6,
+                    "corpo_medio": 0.7,
+                    "corpo_forte": 0.2,
+                },
+                "atracao": {
+                    "olhos_azuis": 0.8,
+                    "olhos_castanhos": 0.6,
+                    "olhos_verdes_mel": 0.8,
+                    "cabelo_escuro": 0.5,
+                    "cabelo_claro_ruivo": 0.7,
+                    "cabelo_cacheado_crespo": 0.8,
+                    "oculos": 0.6,
+                    "tatuagens_piercings": 0.7,
+                    "estilo_esportivo": 0.4,
+                    "estilo_elegante": 0.6,
+                    "estilo_alternativo": 0.9,
+                    "altura_baixa": 0.4,
+                    "altura_media": 0.9,
+                    "altura_alta": 0.6,
+                    "corpo_magro": 0.6,
+                    "corpo_medio": 0.8,
+                    "corpo_forte": 0.5,
+                },
             },
         ),
         (
             "user_carmen",
             "Carmen",
-            "Caseira, religiosa, conservadora e apaixonada por culinaria.",
+            "Caseira, religiosa, elegante, cabelo escuro e apaixonada por culinaria.",
             {
                 "psicologico": {
                     "extroversao": 0.25,
@@ -263,6 +339,44 @@ def popular_banco_mock() -> None:
                     "geografia": 0.3,
                     "geopolitica": 0.15,
                     "astronomia": 0.1,
+                },
+                "fisico": {
+                    "olhos_azuis": 0.0,
+                    "olhos_castanhos": 1.0,
+                    "olhos_verdes_mel": 0.0,
+                    "cabelo_escuro": 1.0,
+                    "cabelo_claro_ruivo": 0.0,
+                    "cabelo_cacheado_crespo": 0.5,
+                    "oculos": 0.4,
+                    "tatuagens_piercings": 0.0,
+                    "estilo_esportivo": 0.1,
+                    "estilo_elegante": 0.9,
+                    "estilo_alternativo": 0.1,
+                    "altura_baixa": 1.0,
+                    "altura_media": 0.0,
+                    "altura_alta": 0.0,
+                    "corpo_magro": 0.4,
+                    "corpo_medio": 0.8,
+                    "corpo_forte": 0.1,
+                },
+                "atracao": {
+                    "olhos_azuis": 0.4,
+                    "olhos_castanhos": 0.8,
+                    "olhos_verdes_mel": 0.6,
+                    "cabelo_escuro": 0.8,
+                    "cabelo_claro_ruivo": 0.2,
+                    "cabelo_cacheado_crespo": 0.5,
+                    "oculos": 0.3,
+                    "tatuagens_piercings": 0.0,
+                    "estilo_esportivo": 0.3,
+                    "estilo_elegante": 0.9,
+                    "estilo_alternativo": 0.1,
+                    "altura_baixa": 0.4,
+                    "altura_media": 0.8,
+                    "altura_alta": 0.7,
+                    "corpo_magro": 0.4,
+                    "corpo_medio": 0.8,
+                    "corpo_forte": 0.6,
                 },
             },
         ),

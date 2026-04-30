@@ -11,9 +11,11 @@ from pydantic import BaseModel, Field
 
 from src.schema.schema_vetores import (
     DEFAULT_VISIBLE_FIELDS,
-    flatten_profile_vectors,
+    flatten_query_vectors,
+    merge_extracted_profile,
     merge_interests_override,
     normalize_profile_vectors,
+    top_interests_summary,
 )
 from src.services import postgres_db as db
 from src.services.auth_service import (
@@ -33,6 +35,7 @@ from src.services.database import (
 )
 from src.services.llm_service import extrair_vetores_da_conversa, gerar_resposta_ia
 from src.services.match_service import (
+    compatibility_breakdown,
     explain_match,
     generate_icebreaker,
     passes_value_filters,
@@ -72,10 +75,20 @@ class ProfileUpdate(BaseModel):
     bio: str | None = None
     theme_mode: str | None = Field(default=None, pattern="^(light|dark)$")
     chat_font_scale: float | None = Field(default=None, ge=0.8, le=1.6)
+    ui_font_scale: float | None = Field(default=None, ge=0.8, le=1.8)
+    accessibility_mode: bool | None = None
 
 
 class InterestsUpdate(BaseModel):
     interests: dict[str, float]
+
+
+class PhysicalUpdate(BaseModel):
+    fisico: dict[str, float]
+
+
+class PhotoUpdate(BaseModel):
+    photo_path: str
 
 
 class VisibilityUpdate(BaseModel):
@@ -144,7 +157,9 @@ def _save_dynamic_profile(
     source_text: str | None,
 ) -> dict[str, Any]:
     text_to_analyze = (source_text or "").strip() or _history_text(user["id"])
-    profile_json = extrair_vetores_da_conversa(text_to_analyze)
+    extracted_profile = extrair_vetores_da_conversa(text_to_analyze)
+    current_profile = db.get_profile(user["id"])
+    profile_json = merge_extracted_profile(current_profile.get("vector_json"), extracted_profile)
     saved_profile = db.save_profile_vectors(user["id"], profile_json)
     vector_profile = merge_interests_override(
         saved_profile["profile_json"],
@@ -167,10 +182,20 @@ def _candidate_profile(candidate_id: str) -> dict[str, Any] | None:
             "id": candidate_id,
             "nome": profile.get("display_name") or user["display_name"],
             "bio": profile.get("bio", ""),
+            "photo_path": profile.get("photo_path", ""),
             "profile_json": profile.get("vector_json") or profile.get("profile_json"),
             "visible_fields": profile.get("visible_fields", DEFAULT_VISIBLE_FIELDS),
         }
     return obter_perfil_vetorial(candidate_id)
+
+
+def _sync_profile_to_vector_store(user: dict[str, Any], profile: dict[str, Any]) -> None:
+    salvar_perfil_usuario(
+        user["id"],
+        profile.get("display_name") or user["display_name"],
+        profile.get("vector_json") or profile.get("profile_json"),
+        bio=profile.get("bio", ""),
+    )
 
 
 @app.get("/")
@@ -335,12 +360,7 @@ def update_profile(
         updates["bio"] = updates["bio"].strip()
 
     profile = db.update_profile(user["id"], updates)
-    salvar_perfil_usuario(
-        user["id"],
-        profile.get("display_name") or user["display_name"],
-        profile.get("vector_json") or profile.get("profile_json"),
-        bio=profile.get("bio", ""),
-    )
+    _sync_profile_to_vector_store(user, profile)
     return profile
 
 
@@ -353,13 +373,33 @@ def update_interests(
     merged = merge_interests_override(profile["profile_json"], payload.interests)
     db.update_profile(user["id"], {"interests_override": payload.interests})
     saved = db.save_profile_vectors(user["id"], merged)
-    salvar_perfil_usuario(
-        user["id"],
-        saved.get("display_name") or user["display_name"],
-        saved["vector_json"],
-        bio=saved.get("bio", ""),
-    )
+    _sync_profile_to_vector_store(user, saved)
     return saved
+
+
+@app.patch("/profile/physical")
+def update_physical_profile(
+    payload: PhysicalUpdate,
+    user: dict[str, Any] = Depends(current_user),
+):
+    saved = db.save_physical_profile(user["id"], payload.fisico)
+    _sync_profile_to_vector_store(user, saved)
+    return saved
+
+
+@app.patch("/profile/photo")
+def update_profile_photo(
+    payload: PhotoUpdate,
+    user: dict[str, Any] = Depends(current_user),
+):
+    photo_path = payload.photo_path.strip()
+    profile = db.update_profile_photo(user["id"], photo_path)
+    return profile
+
+
+@app.get("/profile/readiness")
+def get_profile_readiness(user: dict[str, Any] = Depends(current_user)):
+    return db.get_profile_readiness(user["id"])
 
 
 @app.patch("/profile/visibility")
@@ -399,10 +439,23 @@ def calcular_match_final(
     mensagem: MensagemUsuario,
     user: dict[str, Any] = Depends(current_user),
 ):
+    readiness = db.get_profile_readiness(user["id"])
+    if not readiness["ready"]:
+        missing_labels = {
+            "questionario_fisico": "preencher o questionario fisico",
+            "conversa_ia": "conversar um pouco mais com a IA",
+        }
+        faltando = ", ".join(missing_labels.get(item, item) for item in readiness["missing"])
+        return {
+            "sucesso": False,
+            "mensagem": f"Antes do match, falta {faltando}.",
+            "readiness": readiness,
+        }
+
     profile = _save_dynamic_profile(user, mensagem.texto)
     user_vector_profile = profile.get("vector_json") or profile.get("profile_json")
-    vetor_calculado = flatten_profile_vectors(user_vector_profile)
-    raw_candidates = buscar_melhor_match(user["id"], vetor_calculado, quantidade=12)
+    vetor_calculado = flatten_query_vectors(user_vector_profile)
+    raw_candidates = buscar_melhor_match(user["id"], vetor_calculado, quantidade=20)
     filtros = db.list_value_filters(user["id"])
     approved: list[dict[str, Any]] = []
 
@@ -412,28 +465,42 @@ def calcular_match_final(
         if not ok:
             continue
 
+        breakdown = compatibility_breakdown(user_vector_profile, candidate_profile)
         explanation = explain_match(user_vector_profile, candidate_profile, candidate["nome"])
+        approved.append(
+            {
+                **candidate,
+                "afinidade_numero": breakdown["overall_affinity"],
+                "afinidade": f"{breakdown['overall_affinity']}%",
+                "distancia_chroma": candidate["distancia_matematica"],
+                "distancia_matematica": round(1 - (breakdown["overall_affinity"] / 100), 4),
+                "explanation": explanation,
+                "compatibility_breakdown": breakdown,
+                "top_interests_summary": breakdown["top_interests"],
+            }
+        )
+
+    approved = sorted(approved, key=lambda item: item["afinidade_numero"], reverse=True)[:5]
+
+    saved_matches: list[dict[str, Any]] = []
+    for candidate in approved:
         match_row = db.create_or_update_match(
             user_id=user["id"],
             matched_user_id=candidate["id"],
             matched_name=candidate["nome"],
             affinity=candidate["afinidade_numero"],
             distance=candidate["distancia_matematica"],
-            explanation=explanation,
+            explanation=candidate["explanation"],
         )
-        approved.append(
+        saved_matches.append(
             {
                 **candidate,
                 "match_id": match_row["id"],
-                "explanation": explanation,
             }
         )
 
-        if len(approved) >= 5:
-            break
-
-    if approved:
-        return {"sucesso": True, "match": approved[0], "matches": approved}
+    if saved_matches:
+        return {"sucesso": True, "match": saved_matches[0], "matches": saved_matches}
     return {
         "sucesso": False,
         "mensagem": "Nenhum match encontrado depois dos filtros de valores.",
@@ -462,12 +529,20 @@ def get_match_profile(
         candidate.get("profile_json", {}),
         candidate.get("visible_fields", DEFAULT_VISIBLE_FIELDS),
     )
+    user_profile = db.get_profile(user["id"])
+    breakdown = compatibility_breakdown(
+        user_profile.get("vector_json") or user_profile.get("profile_json"),
+        candidate.get("profile_json", {}),
+    )
     return {
         "match": match_row,
         "profile": {
             "id": candidate["id"],
             "nome": candidate["nome"],
             "bio": candidate.get("bio", ""),
+            "photo_path": candidate.get("photo_path", ""),
+            "top_interests_summary": top_interests_summary(candidate.get("profile_json", {})),
+            "compatibility_breakdown": breakdown,
             "public_profile": public_profile,
         },
     }

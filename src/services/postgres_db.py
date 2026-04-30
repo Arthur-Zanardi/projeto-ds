@@ -14,7 +14,9 @@ from src.schema.schema_vetores import (
     DEFAULT_VISIBLE_FIELDS,
     default_profile_vectors,
     merge_interests_override,
+    merge_physical_profile,
     normalize_profile_vectors,
+    top_interests_summary,
 )
 
 
@@ -74,11 +76,25 @@ def init_database() -> None:
                     vector_json JSONB NOT NULL DEFAULT '{}'::jsonb,
                     visible_fields JSONB NOT NULL DEFAULT '{}'::jsonb,
                     interests_override JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    photo_path TEXT NOT NULL DEFAULT '',
+                    physical_questionnaire_completed BOOLEAN NOT NULL DEFAULT false,
+                    accessibility_mode BOOLEAN NOT NULL DEFAULT false,
+                    ui_font_scale DOUBLE PRECISION NOT NULL DEFAULT 1.0,
                     theme_mode TEXT NOT NULL DEFAULT 'light',
                     chat_font_scale DOUBLE PRECISION NOT NULL DEFAULT 1.0,
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
                 )
                 """
+            )
+            cur.execute("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS photo_path TEXT NOT NULL DEFAULT ''")
+            cur.execute(
+                "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS physical_questionnaire_completed BOOLEAN NOT NULL DEFAULT false"
+            )
+            cur.execute(
+                "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS accessibility_mode BOOLEAN NOT NULL DEFAULT false"
+            )
+            cur.execute(
+                "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ui_font_scale DOUBLE PRECISION NOT NULL DEFAULT 1.0"
             )
             cur.execute(
                 """
@@ -265,12 +281,18 @@ def _profile_row(row: dict[str, Any]) -> dict[str, Any]:
     interests_override = row.get("interests_override") or {}
     vector_json = merge_interests_override(row.get("vector_json") or profile_json, interests_override)
     visible_fields = {**DEFAULT_VISIBLE_FIELDS, **(row.get("visible_fields") or {})}
+    vector_json = normalize_profile_vectors(vector_json)
     return {
         **row,
         "profile_json": profile_json,
         "vector_json": vector_json,
         "visible_fields": visible_fields,
         "interests_override": interests_override,
+        "photo_path": row.get("photo_path") or "",
+        "physical_questionnaire_completed": bool(row.get("physical_questionnaire_completed", False)),
+        "accessibility_mode": bool(row.get("accessibility_mode", False)),
+        "ui_font_scale": float(row.get("ui_font_scale") or 1.0),
+        "top_interests_summary": top_interests_summary(vector_json),
     }
 
 
@@ -280,8 +302,12 @@ def update_profile(user_id: str, updates: dict[str, Any]) -> dict[str, Any]:
         "bio",
         "theme_mode",
         "chat_font_scale",
+        "ui_font_scale",
+        "accessibility_mode",
         "visible_fields",
         "interests_override",
+        "photo_path",
+        "physical_questionnaire_completed",
     }
     fields = {key: value for key, value in updates.items() if key in allowed and value is not None}
     if not fields:
@@ -339,6 +365,58 @@ def save_profile_vectors(user_id: str, profile_json: dict[str, Any]) -> dict[str
                 (user_id, _jsonb(normalized)),
             )
             return _profile_row(row)
+
+
+def save_physical_profile(user_id: str, physical: dict[str, Any]) -> dict[str, Any]:
+    current = get_profile(user_id)
+    merged = merge_physical_profile(current.get("vector_json"), physical)
+    with _connect() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE profiles
+                SET profile_json = %s,
+                    vector_json = %s,
+                    physical_questionnaire_completed = true,
+                    updated_at = now()
+                WHERE user_id = %s
+                RETURNING *
+                """,
+                (_jsonb(merged), _jsonb(merged), user_id),
+            )
+            row = dict(cur.fetchone())
+            cur.execute(
+                """
+                INSERT INTO profile_vector_snapshots (user_id, vector_json)
+                VALUES (%s, %s)
+                """,
+                (user_id, _jsonb(merged)),
+            )
+            return _profile_row(row)
+
+
+def update_profile_photo(user_id: str, photo_path: str) -> dict[str, Any]:
+    return update_profile(user_id, {"photo_path": photo_path})
+
+
+def get_profile_readiness(user_id: str) -> dict[str, Any]:
+    profile = get_profile(user_id)
+    messages = list_profile_chat_messages(user_id)
+    user_messages = [item for item in messages if item.get("remetente") == "usuario"]
+    missing: list[str] = []
+
+    if not profile.get("physical_questionnaire_completed"):
+        missing.append("questionario_fisico")
+    if len(user_messages) < 3:
+        missing.append("conversa_ia")
+
+    return {
+        "ready": not missing,
+        "missing": missing,
+        "physical_questionnaire_completed": profile.get("physical_questionnaire_completed", False),
+        "user_message_count": len(user_messages),
+        "minimum_user_messages": 3,
+    }
 
 
 def save_profile_chat_message(user_id: str, remetente: str, mensagem: str) -> None:
@@ -600,6 +678,8 @@ def delete_profile_data(user_id: str) -> dict[str, str]:
                     vector_json = %s,
                     visible_fields = %s,
                     interests_override = '{}'::jsonb,
+                    photo_path = '',
+                    physical_questionnaire_completed = false,
                     updated_at = now()
                 WHERE user_id = %s
                 """,

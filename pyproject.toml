@@ -28,6 +28,7 @@ dev = [
     "flet-cli>=0.84.0",
     "flet-desktop>=0.84.0",
     "flet-web>=0.84.0",
+    "pyinstaller>=6.11.0",
 ]
 
 [tool.flet]
