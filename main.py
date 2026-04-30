@@ -24,17 +24,17 @@ async def main(page: ft.Page):
         page.views.clear()
         page.views.append(
             # Página Base
-            chatView(page.width, page.height)
-            # ft.View(
-            #     route="/",
-            #     controls=[
-            #         ft.Text("Tela Base", size=32),
-            #         ft.Button(content="Login", on_click=open_login),
-            #         ft.Button(content="Chat", on_click=open_chat),
-            #     ],
-            #     vertical_alignment=ft.MainAxisAlignment.CENTER,
-            #     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            # )
+            #chatView(page.width, page.height)
+            ft.View(
+                route="/",
+                controls=[
+                    ft.Text("Tela Base", size=32),
+                    ft.Button(content="Login", on_click=open_login),
+                    ft.Button(content="Chat", on_click=open_chat),
+                ],
+                vertical_alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            )
         )
 
         if page.route == "/login":
