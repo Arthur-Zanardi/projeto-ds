@@ -18,8 +18,8 @@ O **MatchAI** é um aplicativo de relacionamento focado na Geração Z (18-26 an
 
 1. **Clone o repositório:**
    ```bash
-   git clone [https://github.com/seu-usuario/match-ai.git](https://github.com/seu-usuario/match-ai.git)
-   cd match-ai```
+   git clone https://github.com/Arthur-Zanardi/projeto-ds.git
+   cd projeto-ds```
    
 2. **Crie um ambiente virtual:**
 
