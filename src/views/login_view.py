@@ -1,153 +1,233 @@
 import flet as ft
 
-def login_button_style(fg_color, bg_color):
-    return ft.ButtonStyle(
-        color= fg_color,
-        bgcolor= bg_color,
-        shape=ft.RoundedRectangleBorder(radius=10),
-        padding=24,
-        elevation={
-            ft.ControlState.DEFAULT: 0,
-            ft.ControlState.HOVERED: 5,
-            ft.ControlState.PRESSED: 10,
-        },
-        animation_duration=500,
+def loginView(page: ft.Page) -> ft.View:
+    state = {"mode": "login"}
+
+    CORAL = "#FF7F50"
+    PINK = "#FF69B4"
+    BG_INPUT = "#F3F4F6"
+    TEXT_MUTED = "#6B7280"
+    LINE_DIVIDER = "#E5E7EB"
+    TEXT_MAIN = "#111827"
+
+    title_text = ft.Text("Bem-vindo de volta", size=30, weight=ft.FontWeight.BOLD, color=TEXT_MAIN)
+    subtitle_text = ft.Text("Continue de onde parou e encontre o seu match.", color=TEXT_MUTED, size=14)
+
+    name_field = ft.Container(
+        content=ft.Column([
+            ft.Text("Seu nome", size=12, weight=ft.FontWeight.W_500, color=TEXT_MUTED),
+            ft.TextField(
+                hint_text="Como você se chama?",
+                border_radius=16,
+                bgcolor=BG_INPUT,
+                border_color=ft.Colors.TRANSPARENT,
+                focused_border_color=CORAL,
+                text_size=15,
+                height=52,
+                content_padding=16
+            )
+        ], spacing=5),
+        visible=False,
+        margin=ft.margin.only(bottom=12)
     )
 
-def signup_button_style():
-    return ft.ButtonStyle(
-        color= "#fff0f3",
-        bgcolor= "#ff88ac",
-        shape=ft.RoundedRectangleBorder(radius=10),
-        padding=24,
-        elevation={
-            ft.ControlState.DEFAULT: 0,
-            ft.ControlState.HOVERED: 5,
-            ft.ControlState.PRESSED: 10,
-        },
-        animation_duration=500,
+    email_field = ft.Container(
+        content=ft.Column([
+            ft.Text("E-mail", size=12, weight=ft.FontWeight.W_500, color=TEXT_MUTED),
+            ft.TextField(
+                hint_text="seu@email.com",
+                border_radius=16,
+                bgcolor=BG_INPUT,
+                border_color=ft.Colors.TRANSPARENT,
+                focused_border_color=CORAL,
+                text_size=15,
+                height=52,
+                content_padding=16
+            )
+        ], spacing=5),
+        margin=ft.margin.only(bottom=12)
     )
 
-def loginView(page):
-    
-    async def signup():
+    password_field = ft.Container(
+        content=ft.Column([
+            ft.Text("Senha", size=12, weight=ft.FontWeight.W_500, color=TEXT_MUTED),
+            ft.TextField(
+                hint_text="••••••••",
+                password=True,
+                can_reveal_password=True,
+                border_radius=16,
+                bgcolor=BG_INPUT,
+                border_color=ft.Colors.TRANSPARENT,
+                focused_border_color=CORAL,
+                text_size=15,
+                height=52,
+                content_padding=16
+            )
+        ], spacing=5),
+        margin=ft.margin.only(bottom=12)
+    )
+
+    forgot_password = ft.Container(
+        content=ft.Text("Esqueci minha senha", size=13, color=CORAL, weight=ft.FontWeight.W_500),
+        alignment=ft.Alignment(1.0, 0.0), 
+        visible=True,
+        margin=ft.margin.only(bottom=24)
+    )
+
+    cta_text = ft.Text("Entrar", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD, size=16)
+    cta_icon = ft.Icon(ft.Icons.ARROW_FORWARD, color=ft.Colors.WHITE, size=20)
+
+    def change_mode(new_mode):
+        state["mode"] = new_mode
+        if new_mode == "login":
+            title_text.value = "Bem-vindo de volta"
+            subtitle_text.value = "Continue de onde parou e encontre o seu match."
+            name_field.visible = False
+            forgot_password.visible = True
+            cta_text.value = "Entrar"
+            cta_icon.name = ft.Icons.ARROW_FORWARD
+            
+            login_btn.bgcolor = CORAL
+            login_btn.color = ft.Colors.WHITE
+            register_btn.bgcolor = ft.Colors.TRANSPARENT
+            register_btn.color = TEXT_MUTED
+        else:
+            title_text.value = "Encontre sua conexão"
+            subtitle_text.value = "Crie sua conta e deixe a IA encontrar quem combina com você."
+            name_field.visible = True
+            forgot_password.visible = False
+            cta_text.value = "Criar conta e iniciar entrevista"
+            cta_icon.name = ft.Icons.AUTO_AWESOME
+            
+            register_btn.bgcolor = CORAL
+            register_btn.color = ft.Colors.WHITE
+            login_btn.bgcolor = ft.Colors.TRANSPARENT
+            login_btn.color = TEXT_MUTED
+            
+        page.update()
+
+    login_btn = ft.ElevatedButton(
+        "Entrar",
+        style=ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=12),
+            bgcolor=CORAL,
+            color=ft.Colors.WHITE,
+            elevation=0,
+        ),
+        on_click=lambda _: change_mode("login"),
+        expand=True
+    )
+
+    register_btn = ft.ElevatedButton(
+        "Criar conta",
+        style=ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=12),
+            bgcolor=ft.Colors.TRANSPARENT,
+            color=TEXT_MUTED,
+            elevation=0,
+        ),
+        on_click=lambda _: change_mode("register"),
+        expand=True
+    )
+
+    tabs_container = ft.Container(
+        content=ft.Row([login_btn, register_btn], spacing=0),
+        bgcolor=BG_INPUT,
+        border_radius=14,
+        padding=4,
+        margin=ft.margin.only(bottom=28)
+    )
+
+    async def go_to_chat(e):
         page.views.pop()
-        await page.push_route("/chat")
+        await page.push_route("/chat") 
 
-
-    button_fg_color = "#232d3b"
-    button_bg_color = "#fffbfc"
-
-    # --- Cabeçalho ---
-    logo = ft.Container(
-        content=ft.Icon(
-            ft.Icons.FAVORITE, color=ft.Colors.RED, size=48
+    cta_button = ft.Container(
+        content=ft.Row([cta_icon, cta_text], alignment=ft.MainAxisAlignment.CENTER, spacing=10),
+        gradient=ft.LinearGradient(
+            begin=ft.Alignment(-1.0, 0.0), 
+            end=ft.Alignment(1.0, 0.0),    
+            colors=[CORAL, PINK]
         ),
-        padding=20,
-        bgcolor="#ffe9ec",
-        border_radius=20,
-        shadow=[
-            ft.BoxShadow(
-                spread_radius=1,
-                blur_radius=15,
-                color=ft.Colors.WHITE_30,
-                offset=ft.Offset(1, -4),
-            ),
-            ft.BoxShadow(
-                spread_radius=1,
-                blur_radius=15,
-                color=ft.Colors.GREY_400,
-                offset=ft.Offset(0, 3),
-            ),
-        ]
+        height=56,
+        border_radius=16,
+        on_click=go_to_chat, 
+        margin=ft.margin.only(bottom=24)
     )
 
-    title = ft.Container(content=(
-        ft.Text(
-            "Match.AI", size=42
-        )),
-    )
+    divider_row = ft.Row([
+        ft.Divider(expand=True, color=LINE_DIVIDER, height=1),
+        ft.Text("ou continue com", size=12, color=TEXT_MUTED),
+        ft.Divider(expand=True, color=LINE_DIVIDER, height=1),
+    ], alignment=ft.MainAxisAlignment.CENTER, margin=ft.margin.only(bottom=24))
 
-    subtitle = ft.Container(content=
-        ft.Row(
-            controls=[
-                ft.Text("Find your perfect match powered by advanced AI that understands who you truly are",
-                        size=20,
-                        text_align=ft.TextAlign.CENTER),
-                ],
-            wrap=True,
+    social_buttons = ft.Row([
+        ft.OutlinedButton(
+            "Google",
+            icon=ft.Icons.G_MOBILEDATA,
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=12),
+                color=TEXT_MAIN
+            ),
+            expand=True,
+            height=48
+        ),
+        ft.OutlinedButton(
+            "Apple",
+            icon=ft.Icons.APPLE,
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=12),
+                color=TEXT_MAIN
+            ),
+            expand=True,
+            height=48
         )
-    )
+    ], spacing=12, margin=ft.margin.only(bottom=28))
 
-    # --- Instância dos botões ---
-    google_login = ft.Button(
-        content=ft.Text("Continue with Google",size=14),
-        icon=ft.Image(src="assets/icons/google.svg",width=24,height=24),
-        style=login_button_style(button_fg_color, button_bg_color),
-        expand=True,
-    )
-
-    facebook_login = ft.Button(
-        content=ft.Text("Continue with Facebook",size=14),
-        icon=ft.Image(src="assets/icons/facebook.svg",width=24,height=24),
-        style=login_button_style(button_fg_color, button_bg_color),
-        expand=True,
-    )
-
-    apple_login = ft.Button(
-        content=ft.Text("Continue with Apple",size=14),
-        icon=ft.Image(src="assets/icons/apple.svg",width=24,height=24),
-        style=login_button_style(button_fg_color, button_bg_color),
-        expand=True,
-    )
-
-    signup_button = ft.Button(
-        content=ft.Text("Start AI Interview", size=14),
-        icon=ft.Icons.STAR,
-        style=signup_button_style(),
-        expand=True,
-        on_click=signup,
-    )
-
-    terms_message= "By continuing, you agree to our Terms of Service and Privacy Policy"
-
-    box = ft.Container(
-        content=ft.Column(
-            controls=[
-                ft.Row(controls=[google_login],alignment=ft.MainAxisAlignment.CENTER),
-                ft.Row(controls=[facebook_login],alignment=ft.MainAxisAlignment.CENTER),
-                ft.Row(controls=[apple_login],alignment=ft.MainAxisAlignment.CENTER),
-                ft.Row(controls=[ft.Text("or", size=12)],alignment=ft.MainAxisAlignment.CENTER),
-                ft.Row(controls=[signup_button],alignment=ft.MainAxisAlignment.CENTER),
-                ft.Row(controls=[ft.Text(terms_message,size=12,text_align=ft.TextAlign.CENTER)],alignment=ft.MainAxisAlignment.CENTER,wrap=True),
-            ],
-            tight=True,
-            alignment=ft.MainAxisAlignment.CENTER,
-            horizontal_alignment=ft.Alignment.CENTER,
-        ),
-        margin=50,
-        bgcolor=ft.Colors.WHITE_38,
-        padding=18,
-        border_radius=20,
-    )
-
-    one_column = ft.Column(
-        controls=[
-            logo,
-            title,
-            subtitle,
-            box,
+    terms_text = ft.Text(
+        spans=[
+            ft.TextSpan("Ao continuar, você concorda com nossos "),
+            ft.TextSpan("Termos de Uso", ft.TextStyle(color=CORAL, weight=ft.FontWeight.BOLD)),
+            ft.TextSpan(" e "),
+            ft.TextSpan("Política de Privacidade", ft.TextStyle(color=CORAL, weight=ft.FontWeight.BOLD)),
         ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        alignment=ft.MainAxisAlignment.CENTER,
+        size=12,
+        color=TEXT_MUTED,
+        text_align=ft.TextAlign.CENTER
     )
 
-    # --- Saída de View ---
     return ft.View(
-        route="/login",
+        route="/chat",
+        padding=24,
+        bgcolor="#FAFAFA",
         controls=[
-            one_column
+            ft.Container(
+                content=ft.Row([
+                    ft.Container(
+                        content=ft.Icon(ft.Icons.FAVORITE, color=ft.Colors.WHITE, size=22),
+                        gradient=ft.LinearGradient(colors=[CORAL, PINK]),
+                        width=42,
+                        height=42,
+                        border_radius=14,
+                        alignment=ft.Alignment(0.0, 0.0) 
+                    ),
+                    ft.Text("MatchAi", size=24, weight=ft.FontWeight.BOLD, color=TEXT_MAIN)
+                ], spacing=12),
+                margin=ft.margin.only(top=30, bottom=36)
+            ),
+            
+            title_text,
+            ft.Container(content=subtitle_text, margin=ft.margin.only(bottom=28)),
+            
+            tabs_container,
+            name_field,
+            email_field,
+            password_field,
+            forgot_password,
+            cta_button,
+            divider_row,
+            social_buttons,
+            ft.Container(content=terms_text, alignment=ft.Alignment(0.0, 0.0))
         ],
-        bgcolor=ft.Colors.PINK_50,
-        vertical_alignment=ft.MainAxisAlignment.CENTER,
+        scroll=ft.ScrollMode.AUTO,
     )
