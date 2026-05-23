@@ -7,63 +7,68 @@ def chatView(page):
     def goto_profile_screen(e):
         page.go("/profile")
 
+    def add_message(text, is_me=True):
+        align = ft.CrossAxisAlignment.END if is_me else ft.CrossAxisAlignment.START
+        text_color = ft.Colors.WHITE if is_me else ft.Colors.BLACK_87
+
+        bg_gradient = new_gradient if is_me else None
+        bg_solid = None if is_me else ft.Colors.BLACK_12
+
+        messages_view.controls.append(
+            ft.Column(
+                horizontal_alignment=align,
+                controls=[
+                    ft.Container(
+                        content=ft.Text(f"{text}", size=16, color=text_color), 
+                        gradient=bg_gradient,
+                        bgcolor=bg_solid,
+                        padding=12,
+                        border_radius=18,
+                    )
+                ]
+            )
+        )
+        messages_view.update()
+
     def send_clicked(e):
         texto_usuario = field.value.strip() 
         if not texto_usuario:
             return 
 
-        messages_view.controls.append(
-            ft.Container(
-                content=(ft.Row(
-                    controls=[ft.Text(f"{texto_usuario}", size=24)], 
-                    alignment=ft.CrossAxisAlignment.END,
-                    wrap=True,
-                    )), 
-                bgcolor=ft.Colors.RED_100,
-                padding=12,
-                margin=12,
-                width=200,
-            )
-        )
-        
-        field.value = "" 
-        messages_view.update()
-        
+        add_message(texto_usuario, is_me=True)
+
+        field.value = ""
+        field.focus()
+        page.update()
        
-        recieve_message(texto_usuario) 
+        recieve_message(texto_usuario)
     
     def recieve_message(texto_enviado):
         response = llm_conversation(texto_enviado)
 
-        messages_view.controls.append(
-            ft.Container(
-                content=ft.Row(
-                    controls=[ft.Text(
-                        f"{response}", 
-                        size=24)], 
-                    alignment=ft.CrossAxisAlignment.START, 
-                    wrap=True,
-                    ),
-                bgcolor=ft.Colors.BLUE_100,
-                padding=12,
-                margin=12,
-                width=350,
-            )
+        add_message(response, is_me=False)
+
+    new_gradient=ft.LinearGradient(
+            begin=ft.alignment.Alignment(-1, 0),
+            end=ft.alignment.Alignment(1, 0),
+            colors=["#e63946","#d63384"]
         )
 
-        messages_view.update()
-
     field = ft.TextField(
-        hint_text="Digite aqui a sua mensagem",
+        label="Digite aqui a sua mensagem",
         expand=True,
+        on_submit=send_clicked,
+        autofocus=True,
     )
 
-    send_buttom = ft.FilledIconButton(
-        icon=ft.Icons.SEND,
-        on_click=send_clicked,
-        style=ft.ButtonStyle(
-            color= "#fff0f3",
-            bgcolor= "#ff88ac",)
+    send_buttom = ft.Container(
+        content=ft.IconButton(
+            icon=ft.Icons.SEND,
+            icon_color=ft.Colors.WHITE,
+            on_click=send_clicked,
+        ),
+        gradient=new_gradient,
+        shape=ft.BoxShape.CIRCLE,
     )
 
     messages_view = ft.ListView(
@@ -71,29 +76,28 @@ def chatView(page):
         spacing=8,
         auto_scroll=True,
     )
-
   
     header = ft.Container(
         content=ft.Row(
             controls=[
-                ft.Text("Entrevista com IA", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK87),
+                ft.Text("Entrevista com IA", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK_87),
                 ft.TextButton(
-                    "Ver Perfil", 
+                    "Ver Meu Perfil", 
                     icon=ft.Icons.ARROW_FORWARD, 
                     on_click=goto_profile_screen,
-                    style=ft.ButtonStyle(color="#ff88ac")
+                    style=ft.ButtonStyle(color="#d63384")
                 )
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         ),
-        padding=ft.padding.only(top=10, bottom=10, left=20, right=10)
+        padding=ft.Padding.only(top=10, bottom=10, left=20, right=10)
     )
 
     sender_container = ft.Container(
         content=(ft.Row(controls=[field, send_buttom])),
         height= max(50, page.height*0.08),
         alignment= ft.Alignment.CENTER,
-        padding=ft.padding.symmetric(horizontal=10)
+        padding=ft.Padding.symmetric(horizontal=10)
     )
 
     column = ft.Column(
