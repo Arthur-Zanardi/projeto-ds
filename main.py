@@ -5,6 +5,7 @@ from src.views.login_view import loginView
 from src.views.chat_view import chatView
 from src.views.match_view import matchView
 from src.views.tela_perfil import profileView
+from src.views.chat_match_view import matchChatView
 
 async def main(page: ft.Page):
     page.fonts = {"Google Sans Flex": "assets/fonts/GoogleSansFlex.ttf"}
@@ -33,6 +34,9 @@ async def main(page: ft.Page):
         elif page.route == "/chat":
             page.views.append(matchView(page))
             page.views.append(chatView(page))
+
+        elif page.route == "/chatmatch":
+            page.views.append(matchChatView(page))
         
 
         page.update()

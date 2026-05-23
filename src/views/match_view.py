@@ -5,6 +5,10 @@ def matchView(page):
     async def go_back():
         page.views.pop()
         await page.push_route("/")
+
+    async def goto_chatmatch_view(e):
+        page.views.pop()
+        await page.push_route("/chatmatch") 
     
     match = {
         "nome": "Beatriz Lima",
@@ -67,7 +71,10 @@ def matchView(page):
         controls=[
             ft.IconButton(icon=ft.Icons.CLOSE, icon_color=ft.Colors.GREY_600, icon_size=30, bgcolor=ft.Colors.WHITE),
             ft.IconButton(icon=ft.Icons.FAVORITE, icon_color=ft.Colors.WHITE, icon_size=40, bgcolor=ft.Colors.PINK_400),
-            ft.IconButton(icon=ft.Icons.CHAT_BUBBLE_OUTLINE, icon_color=ft.Colors.PINK_500, icon_size=30, bgcolor=ft.Colors.WHITE),
+            ft.IconButton(
+                icon=ft.Icons.CHAT_BUBBLE_OUTLINE, icon_color=ft.Colors.PINK_500, icon_size=30, bgcolor=ft.Colors.WHITE,
+                on_click=goto_chatmatch_view,
+            ),
         ],
         alignment=ft.MainAxisAlignment.CENTER,
         spacing=20
