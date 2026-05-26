@@ -1,9 +1,12 @@
 import flet as ft
 
 
-def matchChatView(page, match_name="Seu Match", match_id=123):
+def matchChatView(page, match_name=None, match_id=123):
+    match_result = getattr(page, "match_result", {}) or {}
+    nome_match = match_name or match_result.get("nome", "Seu Match")
+
     def goto_profile_screen(e):
-        page.go(f"/profile/{match_id}")
+        page.go("/match")
 
     def add_message(text, is_me=True):
         align = ft.CrossAxisAlignment.END if is_me else ft.CrossAxisAlignment.START
@@ -72,7 +75,7 @@ def matchChatView(page, match_name="Seu Match", match_id=123):
         content=ft.Row(
             controls=[
                 ft.Text(
-                    f"Chat com {match_name}",
+                    f"Chat com {nome_match}",
                     size=18,
                     weight=ft.FontWeight.BOLD,
                     color=ft.Colors.BLACK_87,

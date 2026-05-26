@@ -20,13 +20,11 @@ def profileView(page: ft.Page) -> ft.View:
         "Empático", "Ambicioso", "Bem-humorado"
     ]
 
-    async def go_back(e):
-        page.views.pop()
-        page.go(page.views[-1].route)
+    def go_back(e):
+        page.go("/chat")
 
-    async def on_complete(e):
-        page.views.pop()
-        await page.push_route("/match") 
+    def on_complete(e):
+        page.go("/match")
 
     header = ft.Container(
         content=ft.Row([

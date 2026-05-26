@@ -31,6 +31,9 @@ async def main(page: ft.Page):
         elif page.route == "/profile":
             page.views.append(profileView(page))
 
+        elif page.route.startswith("/profile/"):
+            page.views.append(matchView(page))
+
         elif page.route == "/chat":
             page.views.append(matchView(page))
             page.views.append(chatView(page))
@@ -45,8 +48,11 @@ async def main(page: ft.Page):
         if e.view is not None:
             print("View pop executado em:", e.view)
             page.views.remove(e.view)
-            top_view = page.views[-1]
-            await page.go_async(top_view.route)
+            if page.views:
+                top_view = page.views[-1]
+                await page.go_async(top_view.route)
+            else:
+                await page.go_async("/login")
 
     page.on_route_change = route_change
     page.on_view_pop = view_pop
