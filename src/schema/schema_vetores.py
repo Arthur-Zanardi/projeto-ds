@@ -1,6 +1,19 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-class VetorPsicologico(BaseModel):
+
+class VetorBase(BaseModel):
+    @field_validator("*", mode="before")
+    @classmethod
+    def validar_valor_vetorial(cls, valor):
+        numero = round(float(valor), 2)
+
+        if numero < 0 or numero > 1:
+            raise ValueError("O valor do vetor deve estar entre 0.00 e 1.00")
+
+        return numero
+
+
+class VetorPsicologico(VetorBase):
     # Traços Comportamentais
     extroversao: float = Field(default=0.5, description="0.0 muito introvertido/caseiro, 1.0 muito extrovertido/comunicativo")
     abertura_experiencias: float = Field(default=0.5, description="0.0 prefere rotina rígida, 1.0 busca constantemente inovações e mudanças")
@@ -12,7 +25,7 @@ class VetorPsicologico(BaseModel):
     resolucao_conflitos: float = Field(default=0.5, description="0.0 passivo/evita brigas, 1.0 confrontador/direto")
     competitividade_cooperacao: float = Field(default=0.5, description="0.0 focado em harmonia mútua, 1.0 altamente competitivo (quer vencer argumentos ou jogos)")
 
-class VetorValores(BaseModel):
+class VetorValores(VetorBase):
     ambicao_carreira: float = Field(default=0.5, description="0.0 trabalha só pelo básico, 1.0 altamente focado em estudos e sucesso profissional")
     conservadorismo: float = Field(default=0.5, description="0.0 progressista/desconstruído, 1.0 apegado a tradições familiares/sociais")
     espectro_politico: float = Field(default=0.5, description="0.0 extrema-esquerda, 0.5 centro, 1.0 extrema-direita")
@@ -20,7 +33,7 @@ class VetorValores(BaseModel):
     religiosidade: float = Field(default=0.5, description="0.0 ateu/materialista, 1.0 praticante fervoroso")
     gosto_festas: float = Field(default=0.5, description="0.0 odeia aglomeração, 1.0 baladeiro assíduo")
 
-class VetorInteresses(BaseModel):
+class VetorInteresses(VetorBase):
     # Entretenimento Clássico
     animes: float = Field(default=0.5)
     filmes: float = Field(default=0.5)

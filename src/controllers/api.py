@@ -1,38 +1,332 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+import logging
+from contextlib import asynccontextmanager
 
-from src.services.llm_service import gerar_resposta_ia, extrair_vetores_da_conversa
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, field_validator
+
+from src.services.database import (
+    achatar_dados_vetoriais,
+    buscar_melhor_match,
+    popular_banco_mock,
+    salvar_perfil_usuario,
+)
+from src.services.llm_service import (
+    LLMServiceError,
+    gerar_resposta_ia,
+    extrair_vetores_da_conversa,
+)
+from src.services.sqlite_db import (
+    iniciar_banco_sqlite,
+    obter_historico_chat,
+    obter_ultimo_vetor_sqlite,
+    obter_logs_api,
+    registrar_log_api,
+    salvar_mensagem,
+    salvar_vetores_sqlite,
+)
+
+
+USUARIO_PADRAO = "user_rafaell"
+NOME_USUARIO_PADRAO = "Rafaell"
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    popular_banco_mock()
+    iniciar_banco_sqlite()
+    yield
 
 
 app = FastAPI(
     title="MatchAI API",
     description="Backend para o aplicativo de relacionamento",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
-# Definimos como deve ser o "corpo" da requisição JSON que a API vai receber
-class MensagemUsuario(BaseModel):
+
+class MensagemTextoObrigatorio(BaseModel):
     texto: str
+
+    @field_validator("texto")
+    @classmethod
+    def texto_nao_pode_ser_vazio(cls, texto):
+        texto = texto.strip()
+
+        if not texto:
+            raise ValueError("O campo texto nao pode ser vazio.")
+
+        return texto
+
+
+class MensagemMatch(BaseModel):
+    texto: str = ""
+
+    @field_validator("texto")
+    @classmethod
+    def normalizar_texto(cls, texto):
+        return texto.strip()
+
+
+def registrar_evento(
+    endpoint: str,
+    acao: str,
+    status: str,
+    mensagem: str,
+    detalhes: dict | None = None,
+):
+    if status == "erro":
+        logger.error("%s | %s | %s", endpoint, acao, mensagem)
+    else:
+        logger.info("%s | %s | %s", endpoint, acao, mensagem)
+
+    try:
+        registrar_log_api(
+            usuario=USUARIO_PADRAO,
+            endpoint=endpoint,
+            acao=acao,
+            status=status,
+            mensagem=mensagem,
+            detalhes=detalhes,
+        )
+    except Exception:
+        logger.exception("Falha ao registrar log da API no SQLite.")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    erros = jsonable_encoder(exc.errors())
+    registrar_evento(
+        endpoint=request.url.path,
+        acao="validacao",
+        status="erro",
+        mensagem="Entrada invalida.",
+        detalhes={"erros": erros},
+    )
+    return JSONResponse(status_code=422, content={"detail": erros})
+
 
 @app.get("/")
 def read_root():
-    return {"mensagem": "API do MatchAI está rodando perfeitamente!"}
+    return {"mensagem": "API do MatchAI esta rodando perfeitamente!"}
 
-# Criamos uma rota POST para enviar os dados para a IA
+
+@app.get("/historico")
+def pegar_historico():
+    try:
+        historico = obter_historico_chat(usuario=USUARIO_PADRAO)
+        registrar_evento(
+            endpoint="/historico",
+            acao="buscar_historico",
+            status="sucesso",
+            mensagem="Historico carregado.",
+            detalhes={"total_mensagens": len(historico)},
+        )
+        return {"historico": historico}
+    except Exception as erro:
+        registrar_evento(
+            endpoint="/historico",
+            acao="buscar_historico",
+            status="erro",
+            mensagem="Falha ao carregar historico.",
+            detalhes={"erro": str(erro)},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel carregar o historico.",
+        ) from erro
+
+
+@app.get("/logs")
+def pegar_logs():
+    try:
+        logs = obter_logs_api(usuario=USUARIO_PADRAO)
+        return {"logs": logs}
+    except Exception as erro:
+        logger.exception("Falha ao carregar logs da API.")
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel carregar os logs.",
+        ) from erro
+
+
 @app.post("/chat")
-def conversar_com_ia(mensagem: MensagemUsuario):
-    # Aqui chamamos a sua função passando o texto que chegou na requisição
-    resposta = gerar_resposta_ia(mensagem.texto)
-    
-    # E devolvemos a resposta no formato JSON
-    return {"resposta": resposta}
+def conversar_com_ia(mensagem: MensagemTextoObrigatorio):
+    registrar_evento(
+        endpoint="/chat",
+        acao="receber_mensagem",
+        status="iniciado",
+        mensagem="Mensagem recebida.",
+    )
+
+    try:
+        etapa_ia = "gerar_resposta"
+        salvar_mensagem(
+            usuario=USUARIO_PADRAO,
+            remetente="usuario",
+            mensagem=mensagem.texto,
+        )
+        resposta = gerar_resposta_ia(mensagem.texto)
+        salvar_mensagem(
+            usuario=USUARIO_PADRAO,
+            remetente="ia",
+            mensagem=resposta,
+        )
+
+        historico = obter_historico_chat(usuario=USUARIO_PADRAO)
+        mensagens_usuario = [
+            item["mensagem"]
+            for item in historico
+            if item["remetente"] == "usuario"
+        ]
+        texto_perfil = "\n".join(mensagens_usuario)
+
+        etapa_ia = "atualizar_perfil"
+        vetores_json = extrair_vetores_da_conversa(texto_perfil)
+        salvar_vetores_sqlite(usuario=USUARIO_PADRAO, vetores_dict=vetores_json)
+        salvar_perfil_usuario(
+            USUARIO_PADRAO,
+            NOME_USUARIO_PADRAO,
+            vetores_json,
+        )
+
+        registrar_evento(
+            endpoint="/chat",
+            acao="responder_ia",
+            status="sucesso",
+            mensagem="Resposta da IA gerada e perfil vetorial atualizado.",
+        )
+        return {"resposta": resposta, "perfil_atualizado": True}
+    except LLMServiceError as erro:
+        detail = (
+            "Nao foi possivel atualizar o perfil vetorial."
+            if etapa_ia == "atualizar_perfil"
+            else "Nao foi possivel gerar resposta da IA."
+        )
+        registrar_evento(
+            endpoint="/chat",
+            acao=etapa_ia,
+            status="erro",
+            mensagem=detail,
+            detalhes={"erro": str(erro)},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=detail,
+        ) from erro
+    except Exception as erro:
+        registrar_evento(
+            endpoint="/chat",
+            acao="processar_chat",
+            status="erro",
+            mensagem="Falha ao processar chat.",
+            detalhes={"erro": str(erro)},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Falha interna ao processar chat.",
+        ) from erro
+
 
 @app.post("/analisar_perfil")
-def analisar_perfil(mensagem: MensagemUsuario):
-    # Passamos o texto para a nossa nova função extratora
-    vetores_json = extrair_vetores_da_conversa(mensagem.texto)
-    
-    return {
-        "texto_analisado": mensagem.texto,
-        "vetores_calculados": vetores_json
-    }
+def analisar_perfil(mensagem: MensagemTextoObrigatorio):
+    try:
+        vetores_json = extrair_vetores_da_conversa(mensagem.texto)
+        registrar_evento(
+            endpoint="/analisar_perfil",
+            acao="extrair_vetores",
+            status="sucesso",
+            mensagem="Vetores extraidos da conversa.",
+        )
+        return {
+            "texto_analisado": mensagem.texto,
+            "vetores_calculados": vetores_json,
+        }
+    except LLMServiceError as erro:
+        registrar_evento(
+            endpoint="/analisar_perfil",
+            acao="extrair_vetores",
+            status="erro",
+            mensagem="Falha ao extrair vetores.",
+            detalhes={"erro": str(erro)},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel extrair vetores da conversa.",
+        ) from erro
+
+
+@app.post("/dar_match")
+def calcular_match_final(mensagem: MensagemMatch):
+    try:
+        vetores_json = obter_ultimo_vetor_sqlite(usuario=USUARIO_PADRAO)
+
+        if not vetores_json:
+            registrar_evento(
+                endpoint="/dar_match",
+                acao="calcular_match",
+                status="sem_dados",
+                mensagem="Perfil vetorial inexistente para calcular match.",
+            )
+            return {
+                "sucesso": False,
+                "mensagem": "Ainda nao ha perfil vetorial salvo para calcular um match.",
+            }
+
+        vetor_calculado = achatar_dados_vetoriais(vetores_json)
+
+        melhores_matches = buscar_melhor_match(
+            USUARIO_PADRAO,
+            vetor_calculado,
+            quantidade=1,
+        )
+
+        if melhores_matches:
+            registrar_evento(
+                endpoint="/dar_match",
+                acao="calcular_match",
+                status="sucesso",
+                mensagem="Match calculado.",
+                detalhes={
+                    "match": melhores_matches[0]["id"],
+                    "dimensoes_comparadas": melhores_matches[0].get(
+                        "dimensoes_comparadas"
+                    ),
+                },
+            )
+            return {
+                "sucesso": True,
+                "match": melhores_matches[0],
+            }
+
+        registrar_evento(
+            endpoint="/dar_match",
+            acao="calcular_match",
+            status="sem_match",
+            mensagem="Nenhum match encontrado.",
+        )
+        return {
+            "sucesso": False,
+            "mensagem": "Nenhum match encontrado.",
+        }
+    except Exception as erro:
+        registrar_evento(
+            endpoint="/dar_match",
+            acao="calcular_match",
+            status="erro",
+            mensagem="Falha ao calcular match.",
+            detalhes={"erro": str(erro)},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Falha interna ao calcular match.",
+        ) from erro

@@ -1,9 +1,14 @@
+import asyncio
+
 import flet as ft
+
+from src.services.api_client import carregar_historico, dar_match
 from src.services.llm_conversation import llm_conversation
-from src.services.api_client import enviar_mensagem_chat, carregar_historico
+
 
 def chatView(page):
-    
+    mensagens_usuario = []
+
     def goto_profile_screen(e):
         page.go("/profile")
 
@@ -19,40 +24,84 @@ def chatView(page):
                 horizontal_alignment=align,
                 controls=[
                     ft.Container(
-                        content=ft.Text(f"{text}", size=16, color=text_color), 
+                        content=ft.Text(f"{text}", size=16, color=text_color),
                         gradient=bg_gradient,
                         bgcolor=bg_solid,
                         padding=12,
                         border_radius=18,
                     )
-                ]
+                ],
             )
         )
         messages_view.update()
 
-    def send_clicked(e):
-        texto_usuario = field.value.strip() 
-        if not texto_usuario:
-            return 
+    def append_message(remetente, mensagem):
+        add_message(mensagem, is_me=remetente == "usuario")
 
+    def set_match_button_loading(is_loading):
+        match_button.disabled = is_loading
+        match_button.content = "Buscando..." if is_loading else "Dar match"
+        match_button.icon = ft.Icons.HOURGLASS_TOP if is_loading else ft.Icons.FAVORITE
+        match_button.update()
+
+    def send_clicked(e):
+        texto_usuario = field.value.strip()
+        if not texto_usuario:
+            return
+
+        mensagens_usuario.append(texto_usuario)
         add_message(texto_usuario, is_me=True)
 
         field.value = ""
         field.focus()
         page.update()
-       
+
         recieve_message(texto_usuario)
-    
+
     def recieve_message(texto_enviado):
         response = llm_conversation(texto_enviado)
-
         add_message(response, is_me=False)
 
-    new_gradient=ft.LinearGradient(
-            begin=ft.alignment.Alignment(-1, 0),
-            end=ft.alignment.Alignment(1, 0),
-            colors=["#e63946","#d63384"]
-        )
+    async def match_clicked_async():
+        set_match_button_loading(True)
+
+        try:
+            resultado = await dar_match(mensagens_usuario)
+
+            if resultado.get("sucesso"):
+                match = resultado["match"]
+                texto_match = (
+                    f"Deu match com {match.get('nome', 'alguem especial')}! "
+                    f"Afinidade: {match.get('afinidade', 'sem porcentagem')}"
+                )
+
+                dimensoes = match.get("dimensoes_comparadas")
+                if dimensoes:
+                    texto_match += f" ({dimensoes} pontos comparados)"
+            else:
+                texto_match = resultado.get(
+                    "mensagem",
+                    "Ainda nao foi possivel encontrar um match.",
+                )
+
+            append_message("ia", texto_match)
+        finally:
+            set_match_button_loading(False)
+
+    def match_clicked(e):
+        if hasattr(page, "run_task"):
+            page.run_task(match_clicked_async)
+        else:
+            try:
+                asyncio.get_running_loop().create_task(match_clicked_async())
+            except RuntimeError:
+                pass
+
+    new_gradient = ft.LinearGradient(
+        begin=ft.alignment.Alignment(-1, 0),
+        end=ft.alignment.Alignment(1, 0),
+        colors=["#e63946", "#d63384"],
+    )
 
     field = ft.TextField(
         label="Digite aqui a sua mensagem",
@@ -71,46 +120,91 @@ def chatView(page):
         shape=ft.BoxShape.CIRCLE,
     )
 
+    match_button = ft.FilledButton(
+        content="Dar match",
+        icon=ft.Icons.FAVORITE,
+        on_click=match_clicked,
+        style=ft.ButtonStyle(
+            color="#fff0f3",
+            bgcolor="#d63384",
+        ),
+    )
+
     messages_view = ft.ListView(
         expand=True,
         spacing=8,
         auto_scroll=True,
     )
-  
+
+    async def load_saved_messages():
+        historico = await carregar_historico()
+
+        for item in historico:
+            remetente = item.get("remetente")
+            mensagem = item.get("mensagem")
+
+            if remetente in ("usuario", "ia") and mensagem:
+                if remetente == "usuario":
+                    mensagens_usuario.append(mensagem)
+
+                append_message(remetente, mensagem)
+
+    if hasattr(page, "run_task"):
+        page.run_task(load_saved_messages)
+    else:
+        try:
+            asyncio.get_running_loop().create_task(load_saved_messages())
+        except RuntimeError:
+            pass
+
     header = ft.Container(
-        content=ft.Row(
+        content=ft.Column(
             controls=[
-                ft.Text("Entrevista com IA", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK_87),
-                ft.TextButton(
-                    "Ver Meu Perfil", 
-                    icon=ft.Icons.ARROW_FORWARD, 
-                    on_click=goto_profile_screen,
-                    style=ft.ButtonStyle(color="#d63384")
-                )
+                ft.Row(
+                    controls=[
+                        ft.Text(
+                            "Entrevista com IA",
+                            size=18,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.BLACK_87,
+                        ),
+                        ft.TextButton(
+                            "Ver Meu Perfil",
+                            icon=ft.Icons.ARROW_FORWARD,
+                            on_click=goto_profile_screen,
+                            style=ft.ButtonStyle(color="#d63384"),
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                ft.Row(
+                    controls=[match_button],
+                    alignment=ft.MainAxisAlignment.END,
+                ),
             ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            spacing=6,
         ),
-        padding=ft.Padding.only(top=10, bottom=10, left=20, right=10)
+        padding=ft.Padding.only(top=10, bottom=10, left=20, right=10),
     )
 
     sender_container = ft.Container(
-        content=(ft.Row(controls=[field, send_buttom])),
-        height= max(50, page.height*0.08),
-        alignment= ft.Alignment.CENTER,
-        padding=ft.Padding.symmetric(horizontal=10)
+        content=ft.Row(controls=[field, send_buttom]),
+        height=max(50, page.height * 0.08),
+        alignment=ft.Alignment.CENTER,
+        padding=ft.Padding.symmetric(horizontal=10),
     )
 
     column = ft.Column(
         expand=True,
         controls=[
-            header,          
+            header,
             messages_view,
-            sender_container, 
+            sender_container,
         ],
     )
 
     return ft.View(
-        route="/chat", 
+        route="/chat",
         controls=[column],
         bgcolor=ft.Colors.PINK_50,
     )
