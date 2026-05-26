@@ -2,10 +2,16 @@ import os
 from dotenv import load_dotenv
 import json
 
+from src.schema.schema_vetores import PerfilUsuarioVetorizado
+
 load_dotenv()
 CHAVE_GROQ = os.getenv("GROQ_API_KEY")
 
 client = None
+
+
+class LLMServiceError(Exception):
+    pass
 
 
 def obter_cliente_groq():
@@ -57,7 +63,7 @@ def gerar_resposta_ia(prompt_usuario):
         return completion.choices[0].message.content
 
     except Exception as e:
-        return f"Erro na integração com Groq: {e}"
+        raise LLMServiceError(f"Erro na integracao com Groq: {e}") from e
     
 
 #função para pegar vetores
@@ -67,13 +73,17 @@ def extrair_vetores_da_conversa(historico_conversa: str) -> dict:
     Você é um especialista em psicologia e análise comportamental para um aplicativo de relacionamentos.
     Sua missão é ler a conversa do usuário e extrair um perfil vetorial em formato JSON.
     
-    Regras de Avaliação (Escala 0.0 a 1.0):
+    Regras de Avaliação (Escala 0.00 a 1.00):
     - Avalie cada característica com base EXCLUSIVAMENTE no que foi dito no texto.
-    - Se o usuário NÃO deu indícios claros sobre um tema, mantenha o valor padrão de 0.5.
+    - Se o usuário NÃO deu indícios claros sobre um tema, mantenha o valor padrão de 0.50.
     - 0.0 representa aversão, falta absoluta ou o extremo oposto da característica.
     - 1.0 representa paixão, presença absoluta ou dedicação total à característica.
+    - Use valores com até duas casas decimais, como 0.46, 0.64, 0.82 ou 0.96.
+    - Você pode aumentar ou diminuir os valores em centésimos conforme a força da evidência.
+    - Não arredonde tudo para 0.0, 0.5 ou 1.0.
+    - 0.50 deve significar apenas ausência de evidência clara, neutralidade ou dado desconhecido.
 
-    Você deve retornar APENAS um objeto JSON válido, com a exata estrutura abaixo, substituindo os valores de 0.5 apenas quando tiver evidências claras na conversa:
+    Você deve retornar APENAS um objeto JSON válido, com a exata estrutura abaixo, substituindo os valores de 0.50 apenas quando tiver evidências claras na conversa:
     {
       "psicologico": {
         "extroversao": 0.5,
@@ -134,11 +144,11 @@ def extrair_vetores_da_conversa(historico_conversa: str) -> dict:
         
         texto_json = completion.choices[0].message.content
         dados_extraidos = json.loads(texto_json)
-        return dados_extraidos
+        perfil_validado = PerfilUsuarioVetorizado.model_validate(dados_extraidos)
+        return perfil_validado.model_dump()
 
     except Exception as e:
-        print(f"Erro ao extrair vetores: {e}")
-        return {}
+        raise LLMServiceError(f"Erro ao extrair vetores: {e}") from e
     
 
 # Teste do MVP

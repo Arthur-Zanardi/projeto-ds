@@ -1,7 +1,14 @@
+from fastapi.testclient import TestClient
+
 from src.controllers import api
 
 
+def desativar_logs(monkeypatch):
+    monkeypatch.setattr(api, "registrar_evento", lambda **kwargs: None)
+
+
 def test_chat_salva_mensagem_do_usuario_e_resposta_da_ia(monkeypatch):
+    desativar_logs(monkeypatch)
     mensagens_salvas = []
 
     def salvar_mensagem_fake(**kwargs):
@@ -10,7 +17,7 @@ def test_chat_salva_mensagem_do_usuario_e_resposta_da_ia(monkeypatch):
     monkeypatch.setattr(api, "salvar_mensagem", salvar_mensagem_fake)
     monkeypatch.setattr(api, "gerar_resposta_ia", lambda texto: "Resposta da IA")
 
-    resposta = api.conversar_com_ia(api.MensagemUsuario(texto="Oi"))
+    resposta = api.conversar_com_ia(api.MensagemTextoObrigatorio(texto="Oi"))
 
     assert resposta == {"resposta": "Resposta da IA"}
     assert mensagens_salvas == [
@@ -28,6 +35,7 @@ def test_chat_salva_mensagem_do_usuario_e_resposta_da_ia(monkeypatch):
 
 
 def test_historico_retorna_mensagens_salvas(monkeypatch):
+    desativar_logs(monkeypatch)
     historico = [{"remetente": "usuario", "mensagem": "Oi"}]
     monkeypatch.setattr(
         api,
@@ -40,10 +48,66 @@ def test_historico_retorna_mensagens_salvas(monkeypatch):
     assert resposta == {"historico": historico}
 
 
+def test_chat_sem_texto_retorna_erro_422(monkeypatch):
+    desativar_logs(monkeypatch)
+    client = TestClient(api.app)
+
+    resposta_sem_campo = client.post("/chat", json={})
+    resposta_vazia = client.post("/chat", json={"texto": "   "})
+
+    assert resposta_sem_campo.status_code == 422
+    assert resposta_vazia.status_code == 422
+
+
+def test_analisar_perfil_sem_texto_retorna_erro_422(monkeypatch):
+    desativar_logs(monkeypatch)
+    client = TestClient(api.app)
+
+    resposta = client.post("/analisar_perfil", json={"texto": ""})
+
+    assert resposta.status_code == 422
+
+
+def test_chat_com_falha_da_ia_retorna_503(monkeypatch):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(api, "salvar_mensagem", lambda **kwargs: None)
+
+    def gerar_resposta_fake(texto):
+        raise api.LLMServiceError("Groq fora do ar")
+
+    monkeypatch.setattr(api, "gerar_resposta_ia", gerar_resposta_fake)
+    client = TestClient(api.app)
+
+    resposta = client.post("/chat", json={"texto": "Oi"})
+
+    assert resposta.status_code == 503
+    assert resposta.json() == {
+        "detail": "Nao foi possivel gerar resposta da IA."
+    }
+
+
+def test_historico_com_falha_de_banco_retorna_503(monkeypatch):
+    desativar_logs(monkeypatch)
+
+    def obter_historico_fake(usuario):
+        raise RuntimeError("SQLite indisponivel")
+
+    monkeypatch.setattr(api, "obter_historico_chat", obter_historico_fake)
+    client = TestClient(api.app)
+
+    resposta = client.get("/historico")
+
+    assert resposta.status_code == 503
+    assert resposta.json() == {
+        "detail": "Nao foi possivel carregar o historico."
+    }
+
+
 def test_dar_match_retorna_erro_sem_texto_e_sem_historico(monkeypatch):
+    desativar_logs(monkeypatch)
     monkeypatch.setattr(api, "obter_historico_chat", lambda usuario: [])
 
-    resposta = api.calcular_match_final(api.MensagemUsuario(texto="   "))
+    resposta = api.calcular_match_final(api.MensagemMatch(texto="   "))
 
     assert resposta == {
         "sucesso": False,
@@ -52,6 +116,7 @@ def test_dar_match_retorna_erro_sem_texto_e_sem_historico(monkeypatch):
 
 
 def test_dar_match_usa_historico_e_retorna_match(monkeypatch):
+    desativar_logs(monkeypatch)
     chamadas = {
         "texto_extraido": None,
         "vetores_salvos": None,
@@ -63,15 +128,16 @@ def test_dar_match_usa_historico_e_retorna_match(monkeypatch):
         {"remetente": "usuario", "mensagem": "Tambem gosto de tecnologia"},
     ]
     vetores = {
-        "psicologico": {"extroversao": 0.5},
+        "psicologico": {"extroversao": 0.64},
         "valores": {"religiosidade": 0.2},
-        "interesses": {"musica": 1.0},
+        "interesses": {"musica": 0.96},
     }
     match = {
         "id": "user_maria",
         "nome": "Maria",
-        "afinidade": "82.0%",
-        "distancia_matematica": 0.18,
+        "afinidade": "85.3%",
+        "distancia_matematica": 0.1467,
+        "dimensoes_comparadas": 3,
     }
 
     def extrair_vetores_fake(texto):
@@ -83,7 +149,7 @@ def test_dar_match_usa_historico_e_retorna_match(monkeypatch):
 
     def salvar_perfil_fake(id_usuario, nome, dados_extraidos_ia):
         chamadas["perfil_salvo"] = (id_usuario, nome, dados_extraidos_ia)
-        return [0.5, 0.2, 1.0]
+        return [0.64, 0.2, 0.96]
 
     monkeypatch.setattr(api, "obter_historico_chat", lambda usuario: historico)
     monkeypatch.setattr(api, "extrair_vetores_da_conversa", extrair_vetores_fake)
@@ -95,7 +161,7 @@ def test_dar_match_usa_historico_e_retorna_match(monkeypatch):
         lambda id_usuario, vetor, quantidade: [match],
     )
 
-    resposta = api.calcular_match_final(api.MensagemUsuario(texto=""))
+    resposta = api.calcular_match_final(api.MensagemMatch(texto=""))
 
     assert chamadas["texto_extraido"] == (
         "Gosto de musica\nTambem gosto de tecnologia"

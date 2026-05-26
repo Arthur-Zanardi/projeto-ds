@@ -21,6 +21,7 @@ def test_iniciar_banco_sqlite_cria_tabelas(tmp_path, monkeypatch):
 
     assert "historico_chat" in tabelas
     assert "vetores_salvos" in tabelas
+    assert "logs_api" in tabelas
 
 
 def test_salvar_e_obter_historico_chat_em_ordem(tmp_path, monkeypatch):
@@ -57,3 +58,33 @@ def test_salvar_vetores_sqlite_guarda_json(tmp_path, monkeypatch):
 
     assert usuario == "user_teste"
     assert json.loads(vetores_json) == vetores
+
+
+def test_salvar_e_obter_logs_api_em_ordem(tmp_path, monkeypatch):
+    banco_teste = tmp_path / "teste.db"
+    monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
+
+    sqlite_db.registrar_log_api(
+        usuario="user_teste",
+        endpoint="/chat",
+        acao="receber_mensagem",
+        status="iniciado",
+        mensagem="Mensagem recebida.",
+        detalhes={"texto_tamanho": 2},
+    )
+    sqlite_db.registrar_log_api(
+        usuario="user_teste",
+        endpoint="/chat",
+        acao="responder_ia",
+        status="sucesso",
+        mensagem="Resposta gerada.",
+    )
+
+    logs = sqlite_db.obter_logs_api("user_teste")
+
+    assert logs[0]["endpoint"] == "/chat"
+    assert logs[0]["acao"] == "receber_mensagem"
+    assert logs[0]["status"] == "iniciado"
+    assert logs[0]["detalhes"] == {"texto_tamanho": 2}
+    assert logs[1]["acao"] == "responder_ia"
+    assert logs[1]["detalhes"] is None
