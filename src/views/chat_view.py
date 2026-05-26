@@ -64,20 +64,17 @@ def chatView(page):
 
     async def match_clicked_async():
         set_match_button_loading(True)
+        navegou_para_match = False
 
         try:
             resultado = await dar_match(mensagens_usuario)
 
             if resultado.get("sucesso"):
-                match = resultado["match"]
-                texto_match = (
-                    f"Deu match com {match.get('nome', 'alguem especial')}! "
-                    f"Afinidade: {match.get('afinidade', 'sem porcentagem')}"
-                )
-
-                dimensoes = match.get("dimensoes_comparadas")
-                if dimensoes:
-                    texto_match += f" ({dimensoes} pontos comparados)"
+                page.match_result = resultado["match"]
+                set_match_button_loading(False)
+                navegou_para_match = True
+                page.go("/match")
+                return
             else:
                 texto_match = resultado.get(
                     "mensagem",
@@ -86,7 +83,8 @@ def chatView(page):
 
             append_message("ia", texto_match)
         finally:
-            set_match_button_loading(False)
+            if not navegou_para_match:
+                set_match_button_loading(False)
 
     def match_clicked(e):
         if hasattr(page, "run_task"):
@@ -169,7 +167,7 @@ def chatView(page):
                             color=ft.Colors.BLACK_87,
                         ),
                         ft.TextButton(
-                            "Ver Meu Perfil",
+                            content="Ver Meu Perfil",
                             icon=ft.Icons.ARROW_FORWARD,
                             on_click=goto_profile_screen,
                             style=ft.ButtonStyle(color="#d63384"),
