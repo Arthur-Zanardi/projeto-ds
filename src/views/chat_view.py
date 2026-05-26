@@ -2,9 +2,10 @@ import asyncio
 
 import flet as ft
 from src.services.llm_conversation import llm_conversation
-from src.services.api_client import enviar_mensagem_chat, carregar_historico
+from src.services.api_client import carregar_historico, dar_match
 
 def chatView(page):
+    mensagens_usuario = []
     
     def goto_profile_screen(e):
         page.go("/profile")
@@ -32,11 +33,18 @@ def chatView(page):
             create_message_container(remetente, mensagem)
         )
 
+    def set_match_button_loading(is_loading):
+        match_button.disabled = is_loading
+        match_button.content = "Buscando..." if is_loading else "Dar match"
+        match_button.icon = ft.Icons.HOURGLASS_TOP if is_loading else ft.Icons.FAVORITE
+        match_button.update()
+
     def send_clicked(e):
         texto_usuario = field.value.strip() 
         if not texto_usuario:
             return 
 
+        mensagens_usuario.append(texto_usuario)
         append_message("usuario", texto_usuario)
         
         field.value = "" 
@@ -52,6 +60,40 @@ def chatView(page):
 
         messages_view.update()
 
+    async def match_clicked_async():
+        set_match_button_loading(True)
+
+        resultado = await dar_match(mensagens_usuario)
+
+        if resultado.get("sucesso"):
+            match = resultado["match"]
+            texto_match = (
+                f"Deu match com {match.get('nome', 'alguem especial')}! "
+                f"Afinidade: {match.get('afinidade', 'sem porcentagem')}"
+            )
+
+            dimensoes = match.get("dimensoes_comparadas")
+            if dimensoes:
+                texto_match += f" ({dimensoes} pontos comparados)"
+        else:
+            texto_match = resultado.get(
+                "mensagem",
+                "Ainda nao foi possivel encontrar um match.",
+            )
+
+        append_message("ia", texto_match)
+        messages_view.update()
+        set_match_button_loading(False)
+
+    def match_clicked(e):
+        if hasattr(page, "run_task"):
+            page.run_task(match_clicked_async)
+        else:
+            try:
+                asyncio.get_running_loop().create_task(match_clicked_async())
+            except RuntimeError:
+                pass
+
     field = ft.TextField(
         hint_text="Digite aqui a sua mensagem",
         expand=True,
@@ -63,6 +105,16 @@ def chatView(page):
         style=ft.ButtonStyle(
             color= "#fff0f3",
             bgcolor= "#ff88ac",)
+    )
+
+    match_button = ft.FilledButton(
+        content="Dar match",
+        icon=ft.Icons.FAVORITE,
+        on_click=match_clicked,
+        style=ft.ButtonStyle(
+            color="#fff0f3",
+            bgcolor="#ff88ac",
+        ),
     )
 
     messages_view = ft.ListView(
@@ -79,6 +131,9 @@ def chatView(page):
             mensagem = item.get("mensagem")
 
             if remetente in ("usuario", "ia") and mensagem:
+                if remetente == "usuario":
+                    mensagens_usuario.append(mensagem)
+
                 append_message(remetente, mensagem)
 
         if historico:
@@ -94,17 +149,26 @@ def chatView(page):
 
   
     header = ft.Container(
-        content=ft.Row(
+        content=ft.Column(
             controls=[
-                ft.Text("Entrevista com IA", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK87),
-                ft.TextButton(
-                    "Ver Perfil", 
-                    icon=ft.Icons.ARROW_FORWARD, 
-                    on_click=goto_profile_screen,
-                    style=ft.ButtonStyle(color="#ff88ac")
-                )
+                ft.Row(
+                    controls=[
+                        ft.Text("Entrevista com IA", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK87),
+                        ft.TextButton(
+                            "Ver Perfil", 
+                            icon=ft.Icons.ARROW_FORWARD, 
+                            on_click=goto_profile_screen,
+                            style=ft.ButtonStyle(color="#ff88ac")
+                        )
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                ft.Row(
+                    controls=[match_button],
+                    alignment=ft.MainAxisAlignment.END,
+                ),
             ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            spacing=6,
         ),
         padding=ft.padding.only(top=10, bottom=10, left=20, right=10)
     )

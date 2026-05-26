@@ -60,6 +60,33 @@ def test_salvar_vetores_sqlite_guarda_json(tmp_path, monkeypatch):
     assert json.loads(vetores_json) == vetores
 
 
+def test_obter_ultimo_vetor_sqlite_retorna_vetor_mais_recente(tmp_path, monkeypatch):
+    banco_teste = tmp_path / "teste.db"
+    monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
+    primeiro_vetor = {
+        "psicologico": {"extroversao": 0.3},
+        "valores": {},
+        "interesses": {},
+    }
+    segundo_vetor = {
+        "psicologico": {"extroversao": 0.8},
+        "valores": {},
+        "interesses": {},
+    }
+
+    sqlite_db.salvar_vetores_sqlite("user_teste", primeiro_vetor)
+    sqlite_db.salvar_vetores_sqlite("user_teste", segundo_vetor)
+
+    assert sqlite_db.obter_ultimo_vetor_sqlite("user_teste") == segundo_vetor
+
+
+def test_obter_ultimo_vetor_sqlite_retorna_none_sem_vetor(tmp_path, monkeypatch):
+    banco_teste = tmp_path / "teste.db"
+    monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
+
+    assert sqlite_db.obter_ultimo_vetor_sqlite("user_teste") is None
+
+
 def test_salvar_e_obter_logs_api_em_ordem(tmp_path, monkeypatch):
     banco_teste = tmp_path / "teste.db"
     monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)

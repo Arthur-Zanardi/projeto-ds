@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 from src.services.database import (
+    achatar_dados_vetoriais,
     buscar_melhor_match,
     popular_banco_mock,
     salvar_perfil_usuario,
@@ -20,6 +21,7 @@ from src.services.llm_service import (
 from src.services.sqlite_db import (
     iniciar_banco_sqlite,
     obter_historico_chat,
+    obter_ultimo_vetor_sqlite,
     obter_logs_api,
     registrar_log_api,
     salvar_mensagem,
@@ -167,6 +169,7 @@ def conversar_com_ia(mensagem: MensagemTextoObrigatorio):
     )
 
     try:
+        etapa_ia = "gerar_resposta"
         salvar_mensagem(
             usuario=USUARIO_PADRAO,
             remetente="usuario",
@@ -178,24 +181,47 @@ def conversar_com_ia(mensagem: MensagemTextoObrigatorio):
             remetente="ia",
             mensagem=resposta,
         )
+
+        historico = obter_historico_chat(usuario=USUARIO_PADRAO)
+        mensagens_usuario = [
+            item["mensagem"]
+            for item in historico
+            if item["remetente"] == "usuario"
+        ]
+        texto_perfil = "\n".join(mensagens_usuario)
+
+        etapa_ia = "atualizar_perfil"
+        vetores_json = extrair_vetores_da_conversa(texto_perfil)
+        salvar_vetores_sqlite(usuario=USUARIO_PADRAO, vetores_dict=vetores_json)
+        salvar_perfil_usuario(
+            USUARIO_PADRAO,
+            NOME_USUARIO_PADRAO,
+            vetores_json,
+        )
+
         registrar_evento(
             endpoint="/chat",
             acao="responder_ia",
             status="sucesso",
-            mensagem="Resposta da IA gerada e salva.",
+            mensagem="Resposta da IA gerada e perfil vetorial atualizado.",
         )
-        return {"resposta": resposta}
+        return {"resposta": resposta, "perfil_atualizado": True}
     except LLMServiceError as erro:
+        detail = (
+            "Nao foi possivel atualizar o perfil vetorial."
+            if etapa_ia == "atualizar_perfil"
+            else "Nao foi possivel gerar resposta da IA."
+        )
         registrar_evento(
             endpoint="/chat",
-            acao="responder_ia",
+            acao=etapa_ia,
             status="erro",
-            mensagem="Falha ao gerar resposta da IA.",
+            mensagem=detail,
             detalhes={"erro": str(erro)},
         )
         raise HTTPException(
             status_code=503,
-            detail="Nao foi possivel gerar resposta da IA.",
+            detail=detail,
         ) from erro
     except Exception as erro:
         registrar_evento(
@@ -241,38 +267,22 @@ def analisar_perfil(mensagem: MensagemTextoObrigatorio):
 
 @app.post("/dar_match")
 def calcular_match_final(mensagem: MensagemMatch):
-    texto_recebido = mensagem.texto
-
     try:
-        if not texto_recebido:
-            historico = obter_historico_chat(usuario=USUARIO_PADRAO)
-            mensagens_usuario = [
-                item["mensagem"]
-                for item in historico
-                if item["remetente"] == "usuario"
-            ]
-            texto_recebido = "\n".join(mensagens_usuario)
+        vetores_json = obter_ultimo_vetor_sqlite(usuario=USUARIO_PADRAO)
 
-        if not texto_recebido:
+        if not vetores_json:
             registrar_evento(
                 endpoint="/dar_match",
                 acao="calcular_match",
                 status="sem_dados",
-                mensagem="Conversa insuficiente para calcular match.",
+                mensagem="Perfil vetorial inexistente para calcular match.",
             )
             return {
                 "sucesso": False,
-                "mensagem": "Ainda nao ha conversa suficiente para calcular um match.",
+                "mensagem": "Ainda nao ha perfil vetorial salvo para calcular um match.",
             }
 
-        vetores_json = extrair_vetores_da_conversa(texto_recebido)
-        salvar_vetores_sqlite(usuario=USUARIO_PADRAO, vetores_dict=vetores_json)
-
-        vetor_calculado = salvar_perfil_usuario(
-            USUARIO_PADRAO,
-            NOME_USUARIO_PADRAO,
-            vetores_json,
-        )
+        vetor_calculado = achatar_dados_vetoriais(vetores_json)
 
         melhores_matches = buscar_melhor_match(
             USUARIO_PADRAO,
@@ -308,18 +318,6 @@ def calcular_match_final(mensagem: MensagemMatch):
             "sucesso": False,
             "mensagem": "Nenhum match encontrado.",
         }
-    except LLMServiceError as erro:
-        registrar_evento(
-            endpoint="/dar_match",
-            acao="extrair_vetores",
-            status="erro",
-            mensagem="Falha ao extrair vetores para match.",
-            detalhes={"erro": str(erro)},
-        )
-        raise HTTPException(
-            status_code=503,
-            detail="Nao foi possivel extrair vetores para calcular o match.",
-        ) from erro
     except Exception as erro:
         registrar_evento(
             endpoint="/dar_match",

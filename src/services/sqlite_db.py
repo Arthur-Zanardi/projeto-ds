@@ -107,6 +107,32 @@ def salvar_vetores_sqlite(usuario: str, vetores_dict: dict):
     logger.info("Vetores salvos no SQLite para usuario: %s", usuario)
 
 
+def obter_ultimo_vetor_sqlite(usuario: str = "user_rafaell"):
+    iniciar_banco_sqlite()
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT vetores_json
+        FROM vetores_salvos
+        WHERE usuario = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (usuario,)
+    )
+
+    resultado = cursor.fetchone()
+    conn.close()
+
+    if resultado is None:
+        return None
+
+    return json.loads(resultado[0])
+
+
 def obter_historico_chat(usuario: str = "user_rafaell"):
     iniciar_banco_sqlite()
 

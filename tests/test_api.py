@@ -10,16 +10,45 @@ def desativar_logs(monkeypatch):
 def test_chat_salva_mensagem_do_usuario_e_resposta_da_ia(monkeypatch):
     desativar_logs(monkeypatch)
     mensagens_salvas = []
+    chamadas = {
+        "texto_extraido": None,
+        "vetores_salvos": None,
+        "perfil_salvo": None,
+    }
+    vetores = {
+        "psicologico": {"extroversao": 0.64},
+        "valores": {"religiosidade": 0.2},
+        "interesses": {"musica": 0.96},
+    }
 
     def salvar_mensagem_fake(**kwargs):
         mensagens_salvas.append(kwargs)
 
+    def extrair_vetores_fake(texto):
+        chamadas["texto_extraido"] = texto
+        return vetores
+
+    def salvar_vetores_fake(**kwargs):
+        chamadas["vetores_salvos"] = kwargs
+
+    def salvar_perfil_fake(id_usuario, nome, dados_extraidos_ia):
+        chamadas["perfil_salvo"] = (id_usuario, nome, dados_extraidos_ia)
+        return [0.64, 0.2, 0.96]
+
     monkeypatch.setattr(api, "salvar_mensagem", salvar_mensagem_fake)
     monkeypatch.setattr(api, "gerar_resposta_ia", lambda texto: "Resposta da IA")
+    monkeypatch.setattr(
+        api,
+        "obter_historico_chat",
+        lambda usuario: [{"remetente": "usuario", "mensagem": "Oi"}],
+    )
+    monkeypatch.setattr(api, "extrair_vetores_da_conversa", extrair_vetores_fake)
+    monkeypatch.setattr(api, "salvar_vetores_sqlite", salvar_vetores_fake)
+    monkeypatch.setattr(api, "salvar_perfil_usuario", salvar_perfil_fake)
 
     resposta = api.conversar_com_ia(api.MensagemTextoObrigatorio(texto="Oi"))
 
-    assert resposta == {"resposta": "Resposta da IA"}
+    assert resposta == {"resposta": "Resposta da IA", "perfil_atualizado": True}
     assert mensagens_salvas == [
         {
             "usuario": "user_rafaell",
@@ -32,6 +61,12 @@ def test_chat_salva_mensagem_do_usuario_e_resposta_da_ia(monkeypatch):
             "mensagem": "Resposta da IA",
         },
     ]
+    assert chamadas["texto_extraido"] == "Oi"
+    assert chamadas["vetores_salvos"] == {
+        "usuario": "user_rafaell",
+        "vetores_dict": vetores,
+    }
+    assert chamadas["perfil_salvo"] == ("user_rafaell", "Rafaell", vetores)
 
 
 def test_historico_retorna_mensagens_salvas(monkeypatch):
@@ -86,6 +121,30 @@ def test_chat_com_falha_da_ia_retorna_503(monkeypatch):
     }
 
 
+def test_chat_com_falha_ao_atualizar_vetor_retorna_503(monkeypatch):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(api, "salvar_mensagem", lambda **kwargs: None)
+    monkeypatch.setattr(api, "gerar_resposta_ia", lambda texto: "Resposta da IA")
+    monkeypatch.setattr(
+        api,
+        "obter_historico_chat",
+        lambda usuario: [{"remetente": "usuario", "mensagem": "Oi"}],
+    )
+
+    def extrair_vetores_fake(texto):
+        raise api.LLMServiceError("falha vetorial")
+
+    monkeypatch.setattr(api, "extrair_vetores_da_conversa", extrair_vetores_fake)
+    client = TestClient(api.app)
+
+    resposta = client.post("/chat", json={"texto": "Oi"})
+
+    assert resposta.status_code == 503
+    assert resposta.json() == {
+        "detail": "Nao foi possivel atualizar o perfil vetorial."
+    }
+
+
 def test_historico_com_falha_de_banco_retorna_503(monkeypatch):
     desativar_logs(monkeypatch)
 
@@ -105,28 +164,21 @@ def test_historico_com_falha_de_banco_retorna_503(monkeypatch):
 
 def test_dar_match_retorna_erro_sem_texto_e_sem_historico(monkeypatch):
     desativar_logs(monkeypatch)
-    monkeypatch.setattr(api, "obter_historico_chat", lambda usuario: [])
+    monkeypatch.setattr(api, "obter_ultimo_vetor_sqlite", lambda usuario: None)
 
     resposta = api.calcular_match_final(api.MensagemMatch(texto="   "))
 
     assert resposta == {
         "sucesso": False,
-        "mensagem": "Ainda nao ha conversa suficiente para calcular um match.",
+        "mensagem": "Ainda nao ha perfil vetorial salvo para calcular um match.",
     }
 
 
-def test_dar_match_usa_historico_e_retorna_match(monkeypatch):
+def test_dar_match_usa_ultimo_vetor_salvo_e_retorna_match(monkeypatch):
     desativar_logs(monkeypatch)
     chamadas = {
-        "texto_extraido": None,
-        "vetores_salvos": None,
-        "perfil_salvo": None,
+        "buscar_match": None,
     }
-    historico = [
-        {"remetente": "usuario", "mensagem": "Gosto de musica"},
-        {"remetente": "ia", "mensagem": "Legal"},
-        {"remetente": "usuario", "mensagem": "Tambem gosto de tecnologia"},
-    ]
     vetores = {
         "psicologico": {"extroversao": 0.64},
         "valores": {"religiosidade": 0.2},
@@ -141,34 +193,21 @@ def test_dar_match_usa_historico_e_retorna_match(monkeypatch):
     }
 
     def extrair_vetores_fake(texto):
-        chamadas["texto_extraido"] = texto
-        return vetores
+        raise AssertionError("/dar_match nao deve chamar a IA")
 
-    def salvar_vetores_fake(**kwargs):
-        chamadas["vetores_salvos"] = kwargs
+    def buscar_match_fake(id_usuario, vetor, quantidade):
+        chamadas["buscar_match"] = (id_usuario, vetor, quantidade)
+        return [match]
 
-    def salvar_perfil_fake(id_usuario, nome, dados_extraidos_ia):
-        chamadas["perfil_salvo"] = (id_usuario, nome, dados_extraidos_ia)
-        return [0.64, 0.2, 0.96]
-
-    monkeypatch.setattr(api, "obter_historico_chat", lambda usuario: historico)
+    monkeypatch.setattr(api, "obter_ultimo_vetor_sqlite", lambda usuario: vetores)
     monkeypatch.setattr(api, "extrair_vetores_da_conversa", extrair_vetores_fake)
-    monkeypatch.setattr(api, "salvar_vetores_sqlite", salvar_vetores_fake)
-    monkeypatch.setattr(api, "salvar_perfil_usuario", salvar_perfil_fake)
     monkeypatch.setattr(
         api,
         "buscar_melhor_match",
-        lambda id_usuario, vetor, quantidade: [match],
+        buscar_match_fake,
     )
 
     resposta = api.calcular_match_final(api.MensagemMatch(texto=""))
 
-    assert chamadas["texto_extraido"] == (
-        "Gosto de musica\nTambem gosto de tecnologia"
-    )
-    assert chamadas["vetores_salvos"] == {
-        "usuario": "user_rafaell",
-        "vetores_dict": vetores,
-    }
-    assert chamadas["perfil_salvo"] == ("user_rafaell", "Rafaell", vetores)
+    assert chamadas["buscar_match"] == ("user_rafaell", [0.64, 0.2, 0.96], 1)
     assert resposta == {"sucesso": True, "match": match}
