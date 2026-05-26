@@ -1,12 +1,22 @@
 import os
-from groq import Groq
 from dotenv import load_dotenv
 import json
 
 load_dotenv()
 CHAVE_GROQ = os.getenv("GROQ_API_KEY")
 
-client = Groq(api_key=CHAVE_GROQ)
+client = None
+
+
+def obter_cliente_groq():
+    global client
+
+    if client is None:
+        from groq import Groq
+
+        client = Groq(api_key=CHAVE_GROQ)
+
+    return client
 
 
 nome = "Meu nome é Rafaell Saraiva"
@@ -28,7 +38,7 @@ else:
 
 def gerar_resposta_ia(prompt_usuario):
     try:
-        completion = client.chat.completions.create(
+        completion = obter_cliente_groq().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {
@@ -109,7 +119,7 @@ def extrair_vetores_da_conversa(historico_conversa: str) -> dict:
     """
 
     try:
-        completion = client.chat.completions.create(
+        completion = obter_cliente_groq().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": prompt_sistema},

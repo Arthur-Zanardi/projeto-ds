@@ -1,3 +1,5 @@
+import asyncio
+
 import flet as ft
 from src.services.llm_conversation import llm_conversation
 from src.services.api_client import enviar_mensagem_chat, carregar_historico
@@ -7,24 +9,35 @@ def chatView(page):
     def goto_profile_screen(e):
         page.go("/profile")
 
+    def create_message_container(remetente, mensagem):
+        is_usuario = remetente == "usuario"
+        return ft.Container(
+            content=ft.Row(
+                controls=[ft.Text(f"{mensagem}", size=24)],
+                alignment=(
+                    ft.CrossAxisAlignment.END
+                    if is_usuario
+                    else ft.CrossAxisAlignment.START
+                ),
+                wrap=True,
+            ),
+            bgcolor=ft.Colors.RED_100 if is_usuario else ft.Colors.BLUE_100,
+            padding=12,
+            margin=12,
+            width=200 if is_usuario else 350,
+        )
+
+    def append_message(remetente, mensagem):
+        messages_view.controls.append(
+            create_message_container(remetente, mensagem)
+        )
+
     def send_clicked(e):
         texto_usuario = field.value.strip() 
         if not texto_usuario:
             return 
 
-        messages_view.controls.append(
-            ft.Container(
-                content=(ft.Row(
-                    controls=[ft.Text(f"{texto_usuario}", size=24)], 
-                    alignment=ft.CrossAxisAlignment.END,
-                    wrap=True,
-                    )), 
-                bgcolor=ft.Colors.RED_100,
-                padding=12,
-                margin=12,
-                width=200,
-            )
-        )
+        append_message("usuario", texto_usuario)
         
         field.value = "" 
         messages_view.update()
@@ -35,21 +48,7 @@ def chatView(page):
     def recieve_message(texto_enviado):
         response = llm_conversation(texto_enviado)
 
-        messages_view.controls.append(
-            ft.Container(
-                content=ft.Row(
-                    controls=[ft.Text(
-                        f"{response}", 
-                        size=24)], 
-                    alignment=ft.CrossAxisAlignment.START, 
-                    wrap=True,
-                    ),
-                bgcolor=ft.Colors.BLUE_100,
-                padding=12,
-                margin=12,
-                width=350,
-            )
-        )
+        append_message("ia", response)
 
         messages_view.update()
 
@@ -71,6 +70,27 @@ def chatView(page):
         spacing=8,
         auto_scroll=True,
     )
+
+    async def load_saved_messages():
+        historico = await carregar_historico()
+
+        for item in historico:
+            remetente = item.get("remetente")
+            mensagem = item.get("mensagem")
+
+            if remetente in ("usuario", "ia") and mensagem:
+                append_message(remetente, mensagem)
+
+        if historico:
+            messages_view.update()
+
+    if hasattr(page, "run_task"):
+        page.run_task(load_saved_messages)
+    else:
+        try:
+            asyncio.get_running_loop().create_task(load_saved_messages())
+        except RuntimeError:
+            pass
 
   
     header = ft.Container(

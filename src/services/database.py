@@ -1,15 +1,24 @@
-import chromadb
-from chromadb.config import Settings
+colecao_usuarios = None
 
 # 1. Inicializa o cliente para salvar os dados numa pasta chamada "banco_vetorial"
-chroma_client = chromadb.PersistentClient(path="./banco_vetorial")
 
 # 2. Cria (ou carrega) a coleção (tabela) onde os usuários vão morar.
 # Usamos o espaço "cosine" (Similaridade de Cossenos), que é o padrão ouro na matemática para comparar perfis psicológicos e interesses.
-colecao_usuarios = chroma_client.get_or_create_collection(
-    name="perfis_matchai",
-    metadata={"hnsw:space": "cosine"} 
-)
+
+def obter_colecao_usuarios():
+    global colecao_usuarios
+
+    if colecao_usuarios is None:
+        import chromadb
+
+        chroma_client = chromadb.PersistentClient(path="./banco_vetorial")
+        colecao_usuarios = chroma_client.get_or_create_collection(
+            name="perfis_matchai",
+            metadata={"hnsw:space": "cosine"}
+        )
+
+    return colecao_usuarios
+
 
 def salvar_perfil_usuario(id_usuario: str, nome: str, dados_extraidos_ia: dict):
     """
@@ -28,7 +37,8 @@ def salvar_perfil_usuario(id_usuario: str, nome: str, dados_extraidos_ia: dict):
     )
 
     # 3. Salva no ChromaDB
-    colecao_usuarios.upsert(
+    colecao = obter_colecao_usuarios()
+    colecao.upsert(
         ids=[id_usuario],
         embeddings=[vetor_usuario],
         metadatas=[{"nome": nome}], # Aqui você pode adicionar idade, cidade, etc.
@@ -42,7 +52,8 @@ def buscar_melhor_match(id_usuario_buscando: str, vetor_do_usuario: list, quanti
     """
     Busca no banco de dados a pessoa com o vetor mais próximo (menor distância).
     """
-    resultados = colecao_usuarios.query(
+    colecao = obter_colecao_usuarios()
+    resultados = colecao.query(
         query_embeddings=[vetor_do_usuario],
         n_results=quantidade + 1, # Pedimos +1 porque o sistema vai achar o próprio usuário!
     )
@@ -78,7 +89,8 @@ def buscar_melhor_match(id_usuario_buscando: str, vetor_do_usuario: list, quanti
 
 def popular_banco_mock():
     # Cria os perfis de teste caso o banco esteja vazio
-    resultados = colecao_usuarios.get()
+    colecao = obter_colecao_usuarios()
+    resultados = colecao.get()
     if len(resultados['ids']) == 0:
         print("Populando banco com perfis de teste...")
         
