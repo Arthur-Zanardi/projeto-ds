@@ -1,9 +1,7 @@
 import flet as ft
-# importar funções de conexão dados/servidor
-from src.services.api_client import enviar_mensagem_chat, carregar_historico
+
 
 def matchChatView(page, match_name="Seu Match", match_id=123):
-    
     def goto_profile_screen(e):
         page.go(f"/profile/{match_id}")
 
@@ -19,39 +17,33 @@ def matchChatView(page, match_name="Seu Match", match_id=123):
                 horizontal_alignment=align,
                 controls=[
                     ft.Container(
-                        content=ft.Text(f"{text}", size=16, color=text_color), 
+                        content=ft.Text(f"{text}", size=16, color=text_color),
                         gradient=bg_gradient,
                         bgcolor=bg_solid,
                         padding=12,
                         border_radius=18,
                     )
-                ]
+                ],
             )
         )
         messages_view.update()
-    
+
     def send_clicked(e):
-        texto_usuario = field.value.strip() 
+        texto_usuario = field.value.strip()
         if not texto_usuario:
-            return 
+            return
 
         add_message(texto_usuario, is_me=True)
-        
+
         field.value = ""
         field.focus()
         page.update()
 
-        enviar_mensagem_chat(destinatario_id=match_id, mensagem=texto_usuario)
-    
-    def recieve_match_message(texto_recebido):
-        add_message(texto_recebido, is_me=False)
-
-    
-    new_gradient=ft.LinearGradient(
-            begin=ft.alignment.Alignment(-1, 0),
-            end=ft.alignment.Alignment(1, 0),
-            colors=["#e63946","#d63384"]
-        )
+    new_gradient = ft.LinearGradient(
+        begin=ft.alignment.Alignment(-1, 0),
+        end=ft.alignment.Alignment(1, 0),
+        colors=["#e63946", "#d63384"],
+    )
 
     field = ft.TextField(
         label="Digite aqui a sua mensagem",
@@ -75,41 +67,46 @@ def matchChatView(page, match_name="Seu Match", match_id=123):
         spacing=8,
         auto_scroll=True,
     )
-  
+
     header = ft.Container(
         content=ft.Row(
             controls=[
-                ft.Text(f"Chat com {match_name}", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK87),
+                ft.Text(
+                    f"Chat com {match_name}",
+                    size=18,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.BLACK_87,
+                ),
                 ft.TextButton(
-                    "Ver Perfil", 
-                    icon=ft.Icons.PERSON, 
+                    content="Ver Perfil",
+                    icon=ft.Icons.PERSON,
                     on_click=goto_profile_screen,
-                    style=ft.ButtonStyle(color="#d63384")
-                )
+                    style=ft.ButtonStyle(color="#d63384"),
+                ),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         ),
-        padding=ft.Padding.only(top=10, bottom=10, left=20, right=10)
+        padding=ft.Padding.only(top=10, bottom=10, left=20, right=10),
     )
 
     sender_container = ft.Container(
-        content=(ft.Row(controls=[field, send_buttom])),
-        height= max(50, page.height*0.08),
-        alignment= ft.Alignment.CENTER,
-        padding=ft.Padding.symmetric(horizontal=10)
+        content=ft.Row(controls=[field, send_buttom]),
+        height=max(50, page.height * 0.08),
+        alignment=ft.Alignment.CENTER,
+        padding=ft.Padding.symmetric(horizontal=10),
     )
 
     column = ft.Column(
         expand=True,
         controls=[
-            header,          
+            header,
             messages_view,
-            sender_container, 
+            sender_container,
         ],
     )
 
     return ft.View(
-        route="/match_chat", 
+        route="/chatmatch",
         controls=[column],
         bgcolor=ft.Colors.PINK_50,
     )
