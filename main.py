@@ -1,67 +1,51 @@
-import asyncio
 import flet as ft
-
+from src.services.sqlite_db import SQLiteUserRepository
+from src.controllers.login_controller import LoginController
 from src.views.login_view import loginView
+
 from src.views.chat_view import chatView
-from src.views.match_view import matchView
-from src.views.tela_perfil import profileView
-from src.views.chat_match_view import matchChatView
 
-async def main(page: ft.Page):
-    page.fonts = {"Google Sans Flex": "assets/fonts/GoogleSansFlex.ttf"}
+# Tiramos o async do main, voltando ao padrão hiper estável
+def main(page: ft.Page):
+    page.title = "MatchAi"
+    
+    page.window.width = 450
+    page.window.height = 800
 
-    page.title = "Match.AI"
-    page.height = 915
-    page.width = 412
-    page.theme = ft.Theme(font_family="Google Sans Flex")
-    page.theme_mode = ft.ThemeMode.LIGHT
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-    page.padding = 0
+    usuario_repo = SQLiteUserRepository()
+    autenticacao_controller = LoginController(usuario_repo)
 
-    def route_change(e=None):
-        print(f"Navegando para: {page.route}")
+    # Função gerenciadora de rotas padrão
+    def route_change(e):
         page.views.clear()
-
-        if page.route == "/" or page.route == "/login":
-            page.views.append(loginView(page))
-
-        elif page.route == "/match":
-            page.views.append(matchView(page))
-
-        elif page.route == "/profile":
-            page.views.append(profileView(page))
-
-        elif page.route.startswith("/profile/"):
-            page.views.append(matchView(page))
-
-        elif page.route == "/chat":
-            page.views.append(matchView(page))
-            page.views.append(chatView(page))
-
-        elif page.route == "/chatmatch":
-            page.views.append(matchChatView(page))
         
-
+        if page.route == "/login" or page.route == "/":
+            page.views.append(
+                loginView(page, autenticacao_controller)
+            )
+            
+        elif page.route == "/chat":
+            
+            # === NOVA FORMA DE VERIFICAR A SESSÃO ===
+            if hasattr(page, "usuario_logado") and page.usuario_logado:
+                
+                page.views.append(
+                    chatView(page) 
+                )
+            else:
+                page.route = "/login"
+                page.views.append(loginView(page, autenticacao_controller))
+                
         page.update()
 
-    async def view_pop(e):
-        if e.view is not None:
-            print("View pop executado em:", e.view)
-            page.views.remove(e.view)
-            if page.views:
-                top_view = page.views[-1]
-                await page.go_async(top_view.route)
-            else:
-                await page.go_async("/login")
-
     page.on_route_change = route_change
-    page.on_view_pop = view_pop
-
-    if page.route == "" or page.route is None:
-        page.route = "/"
-        
-    route_change()
-
+    
+    # === O PULO DO GATO ===
+    # Em vez de mandar o Flet processar uma mudança de rota assim que abre 
+    # (o que causa a tela preta), nós definimos a rota raiz de forma "física" e 
+    # engatilhamos a renderização inicial instantaneamente.
+    page.route = "/"
+    route_change(None)
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main)
