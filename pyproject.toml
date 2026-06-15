@@ -11,6 +11,7 @@ authors = [
     {name = "Rafaell Bezerra Saraiva", email = "rbs10@cin.ufpe.br"},
 ]
 dependencies = [
+    "bcrypt>=5.0.0",
     "fastapi>=0.115.0",
     "flet>=0.84.0",
     "groq>=1.1.1",

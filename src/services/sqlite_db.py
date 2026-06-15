@@ -1,8 +1,13 @@
-import sqlite3
 import json
 import logging
+import sqlite3
 from datetime import datetime
 from pathlib import Path
+
+import bcrypt
+
+from src.services.interfaces import IUserRepository
+
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 DB_PATH = BASE_DIR / "banco_relacional.db"
@@ -12,6 +17,7 @@ logger = logging.getLogger(__name__)
 def conectar():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -90,8 +96,21 @@ def iniciar_banco_sqlite():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            senha_hash TEXT NOT NULL
+        )
+    """)
+
     conn.commit()
     conn.close()
+
+
+def agora_sqlite():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def salvar_mensagem(usuario: str, remetente: str, mensagem: str):
@@ -100,15 +119,13 @@ def salvar_mensagem(usuario: str, remetente: str, mensagem: str):
     conn = conectar()
     cursor = conn.cursor()
 
-    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     cursor.execute(
         """
-        INSERT INTO historico_chat 
-        (usuario, remetente, mensagem, data_hora) 
+        INSERT INTO historico_chat
+        (usuario, remetente, mensagem, data_hora)
         VALUES (?, ?, ?, ?)
         """,
-        (usuario, remetente, mensagem, data_hora)
+        (usuario, remetente, mensagem, agora_sqlite()),
     )
 
     conn.commit()
@@ -161,7 +178,6 @@ def criar_match_usuario(
     conn = conectar()
     cursor = conn.cursor()
 
-    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     dados_match_json = (
         json.dumps(dados_match, ensure_ascii=False)
         if dados_match is not None
@@ -185,7 +201,7 @@ def criar_match_usuario(
             nome,
             afinidade,
             dados_match_json,
-            data_hora,
+            agora_sqlite(),
         ),
     )
 
@@ -271,15 +287,13 @@ def salvar_mensagem_match(
         conn.close()
         raise ValueError("Match nao encontrado.")
 
-    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     cursor.execute(
         """
         INSERT INTO mensagens_match
         (usuario, match_id, remetente, mensagem, data_hora)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (usuario, match_id, remetente, mensagem, data_hora),
+        (usuario, match_id, remetente, mensagem, agora_sqlite()),
     )
 
     conn.commit()
@@ -323,17 +337,15 @@ def salvar_vetores_sqlite(usuario: str, vetores_dict: dict):
 
     conn = conectar()
     cursor = conn.cursor()
-
-    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     vetores_json_str = json.dumps(vetores_dict, ensure_ascii=False)
 
     cursor.execute(
         """
-        INSERT INTO vetores_salvos 
-        (usuario, vetores_json, data_hora) 
+        INSERT INTO vetores_salvos
+        (usuario, vetores_json, data_hora)
         VALUES (?, ?, ?)
         """,
-        (usuario, vetores_json_str, data_hora)
+        (usuario, vetores_json_str, agora_sqlite()),
     )
 
     conn.commit()
@@ -356,7 +368,7 @@ def obter_ultimo_vetor_sqlite(usuario: str = "user_rafaell"):
         ORDER BY id DESC
         LIMIT 1
         """,
-        (usuario,)
+        (usuario,),
     )
 
     resultado = cursor.fetchone()
@@ -376,12 +388,12 @@ def obter_historico_chat(usuario: str = "user_rafaell"):
 
     cursor.execute(
         """
-        SELECT remetente, mensagem 
-        FROM historico_chat 
-        WHERE usuario = ? 
+        SELECT remetente, mensagem
+        FROM historico_chat
+        WHERE usuario = ?
         ORDER BY id ASC
         """,
-        (usuario,)
+        (usuario,),
     )
 
     mensagens = cursor.fetchall()
@@ -405,8 +417,6 @@ def registrar_log_api(
 
     conn = conectar()
     cursor = conn.cursor()
-
-    data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     detalhes_json = (
         json.dumps(detalhes, ensure_ascii=False)
         if detalhes is not None
@@ -426,8 +436,8 @@ def registrar_log_api(
             status,
             mensagem,
             detalhes_json,
-            data_hora,
-        )
+            agora_sqlite(),
+        ),
     )
 
     conn.commit()
@@ -455,7 +465,7 @@ def obter_logs_api(usuario: str = "user_rafaell"):
         WHERE usuario = ?
         ORDER BY id ASC
         """,
-        (usuario,)
+        (usuario,),
     )
 
     logs = cursor.fetchall()
@@ -472,3 +482,37 @@ def obter_logs_api(usuario: str = "user_rafaell"):
         }
         for endpoint, acao, status, mensagem, detalhes_json, data_hora in logs
     ]
+
+
+class SQLiteUserRepository(IUserRepository):
+    def __init__(self):
+        iniciar_banco_sqlite()
+
+    def criar_usuario(self, nome: str, email: str, senha_pura: str) -> bool:
+        senha_hash = bcrypt.hashpw(
+            senha_pura.encode("utf-8"),
+            bcrypt.gensalt(),
+        ).decode("utf-8")
+
+        conn = conectar()
+        try:
+            conn.execute(
+                "INSERT INTO usuarios (nome, email, senha_hash) VALUES (?, ?, ?)",
+                (nome, email, senha_hash),
+            )
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        finally:
+            conn.close()
+
+    def buscar_usuario_por_email(self, email: str) -> dict | None:
+        conn = conectar()
+        conn.row_factory = sqlite3.Row
+        try:
+            cursor = conn.execute("SELECT * FROM usuarios WHERE email = ?", (email,))
+            linha = cursor.fetchone()
+            return dict(linha) if linha else None
+        finally:
+            conn.close()

@@ -3,6 +3,7 @@ import sqlite3
 
 import pytest
 
+from src.controllers.login_controller import LoginController
 from src.services import sqlite_db
 
 
@@ -26,6 +27,7 @@ def test_iniciar_banco_sqlite_cria_tabelas(tmp_path, monkeypatch):
     assert "mensagens_match" in tabelas
     assert "vetores_salvos" in tabelas
     assert "logs_api" in tabelas
+    assert "usuarios" in tabelas
 
 
 def test_salvar_e_obter_historico_chat_em_ordem(tmp_path, monkeypatch):
@@ -243,3 +245,23 @@ def test_salvar_e_obter_logs_api_em_ordem(tmp_path, monkeypatch):
     assert logs[0]["detalhes"] == {"texto_tamanho": 2}
     assert logs[1]["acao"] == "responder_ia"
     assert logs[1]["detalhes"] is None
+
+
+def test_sqlite_user_repository_cria_e_autentica_usuario(tmp_path, monkeypatch):
+    banco_teste = tmp_path / "teste.db"
+    monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
+
+    repo = sqlite_db.SQLiteUserRepository()
+
+    assert repo.criar_usuario("Ana", "ana@email.com", "segredo") is True
+    assert repo.criar_usuario("Ana 2", "ana@email.com", "segredo") is False
+
+    usuario = repo.buscar_usuario_por_email("ana@email.com")
+
+    assert usuario["nome"] == "Ana"
+    assert usuario["senha_hash"] != "segredo"
+
+    controller = LoginController(repo)
+
+    assert controller.realizar_login("ana@email.com", "segredo")["nome"] == "Ana"
+    assert controller.realizar_login("ana@email.com", "senha-errada") is None
