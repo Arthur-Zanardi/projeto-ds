@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from src.controllers import api
+from src.services import sqlite_db
 
 
 def desativar_logs(monkeypatch):
@@ -81,6 +82,93 @@ def test_historico_retorna_mensagens_salvas(monkeypatch):
     resposta = api.pegar_historico()
 
     assert resposta == {"historico": historico}
+
+
+def test_matches_criam_listam_e_mantem_mensagens_separadas(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    client = TestClient(api.app)
+
+    resposta_maria = client.post(
+        "/matches",
+        json={
+            "id": "user_maria",
+            "nome": "Maria",
+            "afinidade": "85%",
+            "idade": 27,
+        },
+    )
+    resposta_joao = client.post(
+        "/matches",
+        json={"match_id": "user_joao", "nome": "Joao"},
+    )
+
+    assert resposta_maria.status_code == 201
+    assert resposta_joao.status_code == 201
+    assert resposta_maria.json()["match"]["match_id"] == "user_maria"
+    assert resposta_maria.json()["match"]["dados_match"]["idade"] == 27
+
+    resposta_listar = client.get("/matches")
+
+    assert resposta_listar.status_code == 200
+    assert [
+        match["match_id"]
+        for match in resposta_listar.json()["matches"]
+    ] == ["user_maria", "user_joao"]
+
+    resposta_msg_maria = client.post(
+        "/matches/user_maria/mensagens",
+        json={"texto": "Oi, Maria"},
+    )
+    client.post(
+        "/matches/user_joao/mensagens",
+        json={"mensagem": "Oi, Joao"},
+    )
+    client.post(
+        "/matches/user_maria/mensagens",
+        json={"texto": "Tudo bem?", "remetente": "match"},
+    )
+
+    assert resposta_msg_maria.status_code == 201
+    assert resposta_msg_maria.json()["mensagem"] == {
+        "match_id": "user_maria",
+        "remetente": "usuario",
+        "mensagem": "Oi, Maria",
+    }
+
+    resposta_historico_maria = client.get("/matches/user_maria/mensagens")
+
+    assert resposta_historico_maria.status_code == 200
+    assert resposta_historico_maria.json() == {
+        "match_id": "user_maria",
+        "mensagens": [
+            {"remetente": "usuario", "mensagem": "Oi, Maria"},
+            {"remetente": "match", "mensagem": "Tudo bem?"},
+        ],
+    }
+
+
+def test_mensagens_de_match_inexistente_retornam_404(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    client = TestClient(api.app)
+
+    resposta_get = client.get("/matches/match_inexistente/mensagens")
+    resposta_post = client.post(
+        "/matches/match_inexistente/mensagens",
+        json={"texto": "Oi"},
+    )
+
+    assert resposta_get.status_code == 404
+    assert resposta_post.status_code == 404
+    assert resposta_get.json() == {"detail": "Match nao encontrado."}
+    assert resposta_post.json() == {"detail": "Match nao encontrado."}
 
 
 def test_chat_sem_texto_retorna_erro_422(monkeypatch):

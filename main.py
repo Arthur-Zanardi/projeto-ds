@@ -1,4 +1,3 @@
-import asyncio
 import flet as ft
 
 from src.views.login_view import loginView
@@ -18,11 +17,11 @@ async def main(page: ft.Page):
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.padding = 0
 
-    def route_change(e=None):
+    def route_change(_=None):
         print(f"Navegando para: {page.route}")
         page.views.clear()
 
-        if page.route == "/" or page.route == "/login":
+        if page.route in ("/", "/login"):
             page.views.append(loginView(page))
 
         elif page.route == "/match":

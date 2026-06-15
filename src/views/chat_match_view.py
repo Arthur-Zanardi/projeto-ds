@@ -5,7 +5,7 @@ def matchChatView(page, match_name=None, match_id=123):
     match_result = getattr(page, "match_result", {}) or {}
     nome_match = match_name or match_result.get("nome", "Seu Match")
 
-    def goto_profile_screen(e):
+    def goto_profile_screen(_):
         page.go("/match")
 
     def add_message(text, is_me=True):
@@ -31,7 +31,7 @@ def matchChatView(page, match_name=None, match_id=123):
         )
         messages_view.update()
 
-    def send_clicked(e):
+    def send_clicked(_):
         texto_usuario = field.value.strip()
         if not texto_usuario:
             return
@@ -55,7 +55,7 @@ def matchChatView(page, match_name=None, match_id=123):
         autofocus=True,
     )
 
-    send_buttom = ft.Container(
+    send_button = ft.Container(
         content=ft.IconButton(
             icon=ft.Icons.SEND,
             icon_color=ft.Colors.WHITE,
@@ -93,7 +93,7 @@ def matchChatView(page, match_name=None, match_id=123):
     )
 
     sender_container = ft.Container(
-        content=ft.Row(controls=[field, send_buttom]),
+        content=ft.Row(controls=[field, send_button]),
         height=max(50, page.height * 0.08),
         alignment=ft.Alignment.CENTER,
         padding=ft.Padding.symmetric(horizontal=10),

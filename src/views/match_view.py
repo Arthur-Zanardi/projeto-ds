@@ -47,10 +47,10 @@ def montar_perfil_match(match_result):
 def matchView(page):
     match = montar_perfil_match(getattr(page, "match_result", None))
 
-    def go_back(e):
+    def go_back(_):
         page.go("/chat")
 
-    def goto_chatmatch_view(e):
+    def goto_chatmatch_view(_):
         page.go("/chatmatch")
 
     badge_controls = [

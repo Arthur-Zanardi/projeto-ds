@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.services.database import (
     achatar_dados_vetoriais,
@@ -19,12 +19,17 @@ from src.services.llm_service import (
     extrair_vetores_da_conversa,
 )
 from src.services.sqlite_db import (
+    criar_match_usuario,
     iniciar_banco_sqlite,
+    listar_matches_usuario,
     obter_historico_chat,
+    obter_historico_match,
+    obter_match_usuario,
     obter_ultimo_vetor_sqlite,
     obter_logs_api,
     registrar_log_api,
     salvar_mensagem,
+    salvar_mensagem_match,
     salvar_vetores_sqlite,
 )
 
@@ -72,6 +77,54 @@ class MensagemMatch(BaseModel):
     @classmethod
     def normalizar_texto(cls, texto):
         return texto.strip()
+
+
+class CriarMatchRequisicao(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    match_id: str = Field(alias="id")
+    nome: str
+    afinidade: str | None = None
+    dados_match: dict | None = None
+
+    @field_validator("match_id", "nome")
+    @classmethod
+    def campo_nao_pode_ser_vazio(cls, valor):
+        valor = str(valor).strip()
+
+        if not valor:
+            raise ValueError("O campo nao pode ser vazio.")
+
+        return valor
+
+    def dados_para_salvar(self):
+        if self.dados_match is not None:
+            return self.dados_match
+
+        dados = {
+            "match_id": self.match_id,
+            "nome": self.nome,
+            "afinidade": self.afinidade,
+        }
+        dados.update(self.model_extra or {})
+        return dados
+
+
+class MensagemConversaMatch(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    texto: str = Field(alias="mensagem")
+    remetente: str = "usuario"
+
+    @field_validator("texto", "remetente")
+    @classmethod
+    def texto_nao_pode_ser_vazio(cls, texto):
+        texto = texto.strip()
+
+        if not texto:
+            raise ValueError("O campo nao pode ser vazio.")
+
+        return texto
 
 
 def registrar_evento(
@@ -156,6 +209,163 @@ def pegar_logs():
         raise HTTPException(
             status_code=503,
             detail="Nao foi possivel carregar os logs.",
+        ) from erro
+
+
+@app.get("/matches")
+def pegar_matches():
+    try:
+        matches = listar_matches_usuario(usuario=USUARIO_PADRAO)
+        registrar_evento(
+            endpoint="/matches",
+            acao="listar_matches",
+            status="sucesso",
+            mensagem="Matches carregados.",
+            detalhes={"total_matches": len(matches)},
+        )
+        return {"matches": matches}
+    except Exception as erro:
+        registrar_evento(
+            endpoint="/matches",
+            acao="listar_matches",
+            status="erro",
+            mensagem="Falha ao carregar matches.",
+            detalhes={"erro": str(erro)},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel carregar os matches.",
+        ) from erro
+
+
+@app.post("/matches", status_code=201)
+def criar_match_api(match: CriarMatchRequisicao):
+    try:
+        match_salvo = criar_match_usuario(
+            usuario=USUARIO_PADRAO,
+            match_id=match.match_id,
+            nome=match.nome,
+            afinidade=match.afinidade,
+            dados_match=match.dados_para_salvar(),
+        )
+        registrar_evento(
+            endpoint="/matches",
+            acao="criar_match",
+            status="sucesso",
+            mensagem="Match salvo.",
+            detalhes={"match_id": match.match_id},
+        )
+        return {"match": match_salvo}
+    except Exception as erro:
+        registrar_evento(
+            endpoint="/matches",
+            acao="criar_match",
+            status="erro",
+            mensagem="Falha ao salvar match.",
+            detalhes={"erro": str(erro)},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel salvar o match.",
+        ) from erro
+
+
+@app.get("/matches/{match_id}/mensagens")
+def pegar_mensagens_match(match_id: str):
+    try:
+        match = obter_match_usuario(usuario=USUARIO_PADRAO, match_id=match_id)
+
+        if match is None:
+            registrar_evento(
+                endpoint=f"/matches/{match_id}/mensagens",
+                acao="listar_mensagens_match",
+                status="nao_encontrado",
+                mensagem="Match nao encontrado.",
+                detalhes={"match_id": match_id},
+            )
+            raise HTTPException(
+                status_code=404,
+                detail="Match nao encontrado.",
+            )
+
+        mensagens = obter_historico_match(
+            usuario=USUARIO_PADRAO,
+            match_id=match_id,
+        )
+        registrar_evento(
+            endpoint=f"/matches/{match_id}/mensagens",
+            acao="listar_mensagens_match",
+            status="sucesso",
+            mensagem="Mensagens do match carregadas.",
+            detalhes={"match_id": match_id, "total_mensagens": len(mensagens)},
+        )
+        return {"match_id": match_id, "mensagens": mensagens}
+    except HTTPException:
+        raise
+    except Exception as erro:
+        registrar_evento(
+            endpoint=f"/matches/{match_id}/mensagens",
+            acao="listar_mensagens_match",
+            status="erro",
+            mensagem="Falha ao carregar mensagens do match.",
+            detalhes={"erro": str(erro), "match_id": match_id},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel carregar as mensagens do match.",
+        ) from erro
+
+
+@app.post("/matches/{match_id}/mensagens", status_code=201)
+def enviar_mensagem_match(
+    match_id: str,
+    mensagem: MensagemConversaMatch,
+):
+    try:
+        salvar_mensagem_match(
+            usuario=USUARIO_PADRAO,
+            match_id=match_id,
+            remetente=mensagem.remetente,
+            mensagem=mensagem.texto,
+        )
+        registrar_evento(
+            endpoint=f"/matches/{match_id}/mensagens",
+            acao="enviar_mensagem_match",
+            status="sucesso",
+            mensagem="Mensagem do match salva.",
+            detalhes={"match_id": match_id, "remetente": mensagem.remetente},
+        )
+        return {
+            "sucesso": True,
+            "mensagem": {
+                "match_id": match_id,
+                "remetente": mensagem.remetente,
+                "mensagem": mensagem.texto,
+            },
+        }
+    except ValueError as erro:
+        registrar_evento(
+            endpoint=f"/matches/{match_id}/mensagens",
+            acao="enviar_mensagem_match",
+            status="nao_encontrado",
+            mensagem="Match nao encontrado.",
+            detalhes={"erro": str(erro), "match_id": match_id},
+        )
+        raise HTTPException(
+            status_code=404,
+            detail="Match nao encontrado.",
+        ) from erro
+    except Exception as erro:
+        registrar_evento(
+            endpoint=f"/matches/{match_id}/mensagens",
+            acao="enviar_mensagem_match",
+            status="erro",
+            mensagem="Falha ao salvar mensagem do match.",
+            detalhes={"erro": str(erro), "match_id": match_id},
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel salvar a mensagem do match.",
         ) from erro
 
 

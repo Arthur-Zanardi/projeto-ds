@@ -9,7 +9,7 @@ from src.services.llm_conversation import llm_conversation
 def chatView(page):
     mensagens_usuario = []
 
-    def goto_profile_screen(e):
+    def goto_profile_screen(_):
         page.go("/profile")
 
     def add_message(text, is_me=True):
@@ -44,7 +44,7 @@ def chatView(page):
         match_button.icon = ft.Icons.HOURGLASS_TOP if is_loading else ft.Icons.FAVORITE
         match_button.update()
 
-    def send_clicked(e):
+    def send_clicked(_):
         texto_usuario = field.value.strip()
         if not texto_usuario:
             return
@@ -56,9 +56,9 @@ def chatView(page):
         field.focus()
         page.update()
 
-        recieve_message(texto_usuario)
+        receive_message(texto_usuario)
 
-    def recieve_message(texto_enviado):
+    def receive_message(texto_enviado):
         response = llm_conversation(texto_enviado)
         add_message(response, is_me=False)
 
@@ -75,18 +75,18 @@ def chatView(page):
                 navegou_para_match = True
                 page.go("/match")
                 return
-            else:
-                texto_match = resultado.get(
-                    "mensagem",
-                    "Ainda nao foi possivel encontrar um match.",
-                )
+
+            texto_match = resultado.get(
+                "mensagem",
+                "Ainda nao foi possivel encontrar um match.",
+            )
 
             append_message("ia", texto_match)
         finally:
             if not navegou_para_match:
                 set_match_button_loading(False)
 
-    def match_clicked(e):
+    def match_clicked(_):
         if hasattr(page, "run_task"):
             page.run_task(match_clicked_async)
         else:
@@ -108,7 +108,7 @@ def chatView(page):
         autofocus=True,
     )
 
-    send_buttom = ft.Container(
+    send_button = ft.Container(
         content=ft.IconButton(
             icon=ft.Icons.SEND,
             icon_color=ft.Colors.WHITE,
@@ -186,7 +186,7 @@ def chatView(page):
     )
 
     sender_container = ft.Container(
-        content=ft.Row(controls=[field, send_buttom]),
+        content=ft.Row(controls=[field, send_button]),
         height=max(50, page.height * 0.08),
         alignment=ft.Alignment.CENTER,
         padding=ft.Padding.symmetric(horizontal=10),
