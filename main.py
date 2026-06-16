@@ -1,9 +1,13 @@
+import os
+
 import flet as ft
 
 from src.controllers.login_controller import LoginController
+from src.services.profile_images import MAX_PROFILE_IMAGE_BYTES
 from src.services.sqlite_db import SQLiteUserRepository
 from src.views.chat_match_view import matchChatView
 from src.views.chat_view import chatView
+from src.views.conversations_view import conversationsView
 from src.views.login_view import loginView
 from src.views.match_view import matchView
 from src.views.tela_perfil import profileView
@@ -50,15 +54,21 @@ async def main(page: ft.Page):
 
         elif page.route.startswith("/profile/"):
             if usuario_autenticado():
-                page.views.append(matchView(page))
+                page.views.append(profileView(page))
             else:
                 page.route = "/login"
                 mostrar_login()
 
         elif page.route == "/chat":
             if usuario_autenticado():
-                page.views.append(matchView(page))
                 page.views.append(chatView(page))
+            else:
+                page.route = "/login"
+                mostrar_login()
+
+        elif page.route == "/conversas":
+            if usuario_autenticado():
+                page.views.append(conversationsView(page))
             else:
                 page.route = "/login"
                 mostrar_login()
@@ -93,4 +103,5 @@ async def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    os.environ.setdefault("FLET_MAX_UPLOAD_SIZE", str(MAX_PROFILE_IMAGE_BYTES))
+    ft.app(target=main, upload_dir="assets")

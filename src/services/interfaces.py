@@ -3,7 +3,17 @@ from abc import ABC, abstractmethod
 
 class IUserRepository(ABC):
     @abstractmethod
-    def criar_usuario(self, nome: str, email: str, senha_pura: str) -> bool:
+    def criar_usuario(
+        self,
+        email: str,
+        senha_pura: str,
+        nome: str | None = None,
+        idade=None,
+        foto_url=None,
+        descricao=None,
+        localizacao=None,
+        cargo=None,
+    ) -> bool:
         pass
 
     @abstractmethod

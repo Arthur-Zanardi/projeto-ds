@@ -18,8 +18,27 @@ class LoginController:
                 return usuario
         return None
 
-    def realizar_cadastro(self, nome: str, email: str, senha_pura: str) -> bool:
+    def realizar_cadastro(
+        self,
+        email: str,
+        senha_pura: str,
+        nome: str | None = None,
+        idade=None,
+        foto_url=None,
+        descricao=None,
+        localizacao=None,
+        cargo=None,
+    ) -> bool:
         """Retorna True se o cadastro for bem-sucedido, ou False se houver erro."""
-        if not nome or not email or not senha_pura:
+        if not email or not senha_pura:
             return False
-        return self.user_repo.criar_usuario(nome, email, senha_pura)
+        return self.user_repo.criar_usuario(
+            email=email,
+            senha_pura=senha_pura,
+            nome=nome,
+            idade=idade,
+            foto_url=foto_url,
+            descricao=descricao,
+            localizacao=localizacao,
+            cargo=cargo,
+        )

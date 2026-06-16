@@ -28,6 +28,10 @@ def test_iniciar_banco_sqlite_cria_tabelas(tmp_path, monkeypatch):
     assert "historico_chat" in tabelas
     assert "matches_usuario" in tabelas
     assert "mensagens_match" in tabelas
+    assert "perfis_publicos" in tabelas
+    assert "acoes_match" in tabelas
+    assert "conversas_match" in tabelas
+    assert "mensagens_conversa" in tabelas
     assert "vetores_salvos" in tabelas
     assert "logs_api" in tabelas
     assert "usuarios" in tabelas
@@ -172,6 +176,61 @@ def test_salvar_mensagem_match_inexistente_retorna_erro(
         )
 
 
+def test_perfil_publico_acao_e_match_confirmado_compartilham_conversa(
+    tmp_path,
+    monkeypatch,
+):
+    banco_teste = tmp_path / "teste.db"
+    monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
+
+    perfil_ana = sqlite_db.salvar_perfil_publico(
+        usuario="ANA@EMAIL.COM",
+        nome="Ana",
+        idade="24",
+        descricao="Perfil Ana",
+        localizacao="Recife",
+        cargo="Dev",
+    )
+    perfil_bia = sqlite_db.salvar_perfil_publico(
+        usuario="bia@email.com",
+        nome="Bia",
+        idade=25,
+        descricao="Perfil Bia",
+        localizacao="Olinda",
+        cargo="Designer",
+    )
+
+    assert perfil_ana["usuario"] == "ana@email.com"
+    assert perfil_ana["idade"] == 24
+    assert sqlite_db.registrar_acao_match(
+        "ana@email.com",
+        "bia@email.com",
+        "like",
+    )["acao"] == "like"
+
+    sqlite_db.confirmar_match(
+        usuario="ana@email.com",
+        candidato_id="bia@email.com",
+        perfil_candidato=perfil_bia,
+        perfil_usuario=perfil_ana,
+        tipo="real",
+        sugestoes=[{"campo": "musica", "texto": "Oi"}],
+    )
+    sqlite_db.salvar_mensagem_match(
+        "ana@email.com",
+        "bia@email.com",
+        "usuario",
+        "Oi Bia",
+    )
+
+    assert sqlite_db.obter_historico_match("ana@email.com", "bia@email.com") == [
+        {"remetente": "usuario", "mensagem": "Oi Bia"},
+    ]
+    assert sqlite_db.obter_historico_match("bia@email.com", "ana@email.com") == [
+        {"remetente": "match", "mensagem": "Oi Bia"},
+    ]
+
+
 def test_salvar_vetores_sqlite_guarda_json(tmp_path, monkeypatch):
     banco_teste = tmp_path / "teste.db"
     monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
@@ -256,8 +315,8 @@ def test_sqlite_user_repository_cria_e_autentica_usuario(tmp_path, monkeypatch):
 
     repo = sqlite_db.SQLiteUserRepository()
 
-    assert repo.criar_usuario("Ana", "ana@email.com", "segredo") is True
-    assert repo.criar_usuario("Ana 2", "ana@email.com", "segredo") is False
+    assert repo.criar_usuario("ana@email.com", "segredo", nome="Ana") is True
+    assert repo.criar_usuario("ana@email.com", "segredo", nome="Ana 2") is False
 
     usuario = repo.buscar_usuario_por_email("ana@email.com")
 
@@ -268,6 +327,25 @@ def test_sqlite_user_repository_cria_e_autentica_usuario(tmp_path, monkeypatch):
 
     assert controller.realizar_login("ana@email.com", "segredo")["nome"] == "Ana"
     assert controller.realizar_login("ana@email.com", "senha-errada") is None
+
+
+def test_sqlite_user_repository_cria_usuario_com_perfil_default_incompleto(
+    tmp_path,
+    monkeypatch,
+):
+    banco_teste = tmp_path / "teste.db"
+    monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
+
+    repo = sqlite_db.SQLiteUserRepository()
+
+    assert repo.criar_usuario("fellipe@example.com", "segredo") is True
+
+    usuario = repo.buscar_usuario_por_email("fellipe@example.com")
+    perfil = sqlite_db.obter_perfil_publico("fellipe@example.com")
+
+    assert usuario["nome"] == "Fellipe"
+    assert perfil["nome"] == "Fellipe"
+    assert perfil["descricao"] == "Perfil em construcao."
 
 
 def test_migrar_usuario_legado_mescla_matches_sem_apagar_mensagens(

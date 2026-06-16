@@ -250,6 +250,191 @@ def test_historico_matches_e_mensagens_sao_separados_por_email(
     ]
 
 
+def test_like_real_exige_reciprocidade_e_compartilha_conversa(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    monkeypatch.setattr(
+        api,
+        "gerar_sugestoes_para_match",
+        lambda usuario, candidato, vetor: [
+            {"campo": "musica", "rotulo": "Musica", "texto": "Qual musica descreve sua semana?"}
+        ],
+    )
+    sqlite_db.salvar_perfil_publico(
+        usuario="fellipe@example.com",
+        nome="Fellipe",
+        idade=25,
+        descricao="Perfil do Fellipe",
+        localizacao="Recife",
+        cargo="Dev",
+    )
+    sqlite_db.salvar_perfil_publico(
+        usuario="fernando@example.com",
+        nome="Fernando",
+        idade=26,
+        descricao="Perfil do Fernando",
+        localizacao="Olinda",
+        cargo="Designer",
+    )
+    client = TestClient(api.app)
+
+    pendente = client.post(
+        "/matches/fernando@example.com/acao",
+        headers=HEADERS_FELLIPE,
+        json={"acao": "like"},
+    )
+
+    assert pendente.status_code == 200
+    assert pendente.json()["status"] == "pendente"
+    assert client.get("/matches", headers=HEADERS_FELLIPE).json()["matches"] == []
+
+    confirmado = client.post(
+        "/matches/fellipe@example.com/acao",
+        headers=HEADERS_FERNANDO,
+        json={"acao": "like"},
+    )
+
+    assert confirmado.status_code == 200
+    assert confirmado.json()["status"] == "confirmado"
+    assert confirmado.json()["sugestoes"][0]["campo"] == "musica"
+    assert [
+        match["match_id"]
+        for match in client.get("/matches", headers=HEADERS_FELLIPE).json()["matches"]
+    ] == ["fernando@example.com"]
+    assert [
+        match["match_id"]
+        for match in client.get("/matches", headers=HEADERS_FERNANDO).json()["matches"]
+    ] == ["fellipe@example.com"]
+
+    client.post(
+        "/matches/fellipe@example.com/mensagens",
+        headers=HEADERS_FERNANDO,
+        json={"mensagem": "Oi, Fellipe"},
+    )
+
+    assert client.get(
+        "/matches/fernando@example.com/mensagens",
+        headers=HEADERS_FELLIPE,
+    ).json()["mensagens"] == [
+        {"remetente": "match", "mensagem": "Oi, Fellipe"},
+    ]
+
+
+def test_like_em_mock_confirma_imediatamente(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    monkeypatch.setattr(api, "gerar_sugestoes_para_match", lambda *args: [])
+    sqlite_db.salvar_perfil_publico(
+        usuario="user_luna",
+        nome="Luna",
+        idade=23,
+        descricao="Perfil mock",
+        localizacao="Recife",
+        cargo="Musica",
+        origem="mock",
+    )
+    client = TestClient(api.app)
+
+    resposta = client.post(
+        "/matches/user_luna/acao",
+        headers=HEADERS_FELLIPE,
+        json={"acao": "like"},
+    )
+
+    assert resposta.status_code == 200
+    assert resposta.json()["status"] == "confirmado"
+    assert [
+        match["match_id"]
+        for match in client.get("/matches", headers=HEADERS_FELLIPE).json()["matches"]
+    ] == ["user_luna"]
+
+
+def test_acao_match_funciona_sem_perfil_publico_previo(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    monkeypatch.setattr(api, "gerar_sugestoes_para_match", lambda *args: [])
+    client = TestClient(api.app)
+
+    recusa = client.post(
+        "/matches/user_sem_perfil/acao",
+        headers=HEADERS_FELLIPE,
+        json={"acao": "pass"},
+    )
+    like_mock = client.post(
+        "/matches/user_sem_perfil/acao",
+        headers=HEADERS_FELLIPE,
+        json={"acao": "like"},
+    )
+
+    assert recusa.status_code == 200
+    assert recusa.json()["status"] == "recusado"
+    assert like_mock.status_code == 200
+    assert like_mock.json()["status"] == "confirmado"
+    assert like_mock.json()["match"]["nome"] == "Sem Perfil"
+
+
+def test_atualizar_perfil_publico_aceita_idade_textual(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    client = TestClient(api.app)
+
+    resposta = client.put(
+        "/perfil_publico",
+        headers=HEADERS_FELLIPE,
+        json={
+            "nome": "Fellipe",
+            "idade": "vinte e cinco",
+            "descricao": "Bio",
+            "localizacao": "Recife",
+            "cargo": "Dev",
+        },
+    )
+
+    assert resposta.status_code == 200
+    assert resposta.json()["perfil"]["idade"] is None
+
+
+def test_atualizar_perfil_publico_salva_foto_e_status_completo(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    client = TestClient(api.app)
+
+    resposta = client.put(
+        "/perfil_publico",
+        headers=HEADERS_FELLIPE,
+        json={
+            "nome": "Fellipe",
+            "idade": "25",
+            "foto_url": "uploads/profile_images/fellipe/foto.jpg",
+            "descricao": "Bio completa",
+            "localizacao": "Recife",
+            "cargo": "Dev",
+        },
+    )
+
+    perfil = resposta.json()["perfil"]
+
+    assert resposta.status_code == 200
+    assert perfil["foto_url"] == "uploads/profile_images/fellipe/foto.jpg"
+    assert perfil["perfil_completo"] is True
+    assert perfil["campos_faltantes"] == []
+
+
 def test_criar_mock_customizado_exige_admin(
     tmp_path,
     monkeypatch,
@@ -281,6 +466,54 @@ def test_criar_mock_customizado_exige_admin(
     assert resposta_admin.status_code == 201
     assert resposta_admin.json()["match"]["usuario"] == ADMIN_EMAIL
     assert resposta_admin.json()["match"]["match_id"] == "custom_luna"
+
+
+def test_endpoint_perfis_mock_exige_admin_e_salva_vetor(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    chamadas = {}
+    monkeypatch.setattr(
+        api,
+        "salvar_perfil_vetorial",
+        lambda perfil_id, nome, vetores: chamadas.setdefault(
+            "vetor",
+            (perfil_id, nome, vetores),
+        ),
+    )
+    client = TestClient(api.app)
+    payload = {
+        "id": "custom_luna",
+        "nome": "Luna",
+        "idade": 22,
+        "descricao": "Perfil mock",
+        "localizacao": "Recife",
+        "cargo": "Musica",
+        "vetores": {"psicologico": {"extroversao": 0.8}},
+    }
+
+    resposta_comum = client.post(
+        "/perfis_mock",
+        headers=HEADERS_FELLIPE,
+        json=payload,
+    )
+    resposta_admin = client.post(
+        "/perfis_mock",
+        headers=HEADERS_ADMIN,
+        json=payload,
+    )
+
+    assert resposta_comum.status_code == 403
+    assert resposta_admin.status_code == 201
+    assert resposta_admin.json()["perfil"]["usuario"] == "custom_luna"
+    assert resposta_admin.json()["perfil"]["mock_customizado"] is True
+    assert chamadas["vetor"] == (
+        "custom_luna",
+        "Luna",
+        {"psicologico": {"extroversao": 0.8}},
+    )
 
 
 def test_mensagens_de_match_inexistente_retornam_404(
@@ -384,6 +617,18 @@ def test_historico_com_falha_de_banco_retorna_503(monkeypatch):
 
 def test_dar_match_retorna_erro_sem_texto_e_sem_historico(monkeypatch):
     desativar_logs(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "perfil_publico_ou_padrao",
+        lambda usuario: {
+            "nome": "Rafaell",
+            "idade": 25,
+            "foto_url": "uploads/profile_images/rafaell/foto.jpg",
+            "descricao": "Bio completa",
+            "localizacao": "Recife",
+            "cargo": "Dev",
+        },
+    )
     monkeypatch.setattr(api, "obter_ultimo_vetor_sqlite", lambda usuario: None)
 
     resposta = api.calcular_match_final(api.MensagemMatch(texto="   "))
@@ -391,6 +636,36 @@ def test_dar_match_retorna_erro_sem_texto_e_sem_historico(monkeypatch):
     assert resposta == {
         "sucesso": False,
         "mensagem": "Ainda nao ha perfil vetorial salvo para calcular um match.",
+    }
+
+
+def test_dar_match_bloqueia_perfil_publico_incompleto(monkeypatch):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(
+        api,
+        "perfil_publico_ou_padrao",
+        lambda usuario: {
+            "nome": "Fellipe",
+            "idade": 25,
+            "foto_url": "",
+            "descricao": "Bio",
+            "localizacao": "Recife",
+            "cargo": "Dev",
+        },
+    )
+    monkeypatch.setattr(
+        api,
+        "obter_ultimo_vetor_sqlite",
+        lambda usuario: {"psicologico": {"extroversao": 0.5}},
+    )
+
+    resposta = api.calcular_match_final(api.MensagemMatch(texto=""))
+
+    assert resposta == {
+        "sucesso": False,
+        "perfil_incompleto": True,
+        "campos_faltantes": ["foto_url"],
+        "mensagem": "Complete seu perfil antes de descobrir matches.",
     }
 
 
@@ -411,16 +686,58 @@ def test_dar_match_usa_ultimo_vetor_salvo_e_retorna_match(monkeypatch):
         "distancia_matematica": 0.1467,
         "dimensoes_comparadas": 3,
     }
+    perfil_maria = {
+        "id": "user_maria",
+        "match_id": "user_maria",
+        "usuario": "user_maria",
+        "nome": "Maria",
+        "idade": 22,
+        "imagem": "foto.jpg",
+        "foto_url": "foto.jpg",
+        "descricao": "Perfil de Maria",
+        "localizacao": "Recife",
+        "cargo": "Designer",
+        "origem": "mock",
+        "tipo": "mock",
+        "mock_customizado": False,
+        "data_hora": "2026-01-01",
+    }
 
     def extrair_vetores_fake(texto):
         raise AssertionError("/dar_match nao deve chamar a IA")
 
-    def buscar_match_fake(id_usuario, vetor, quantidade):
-        chamadas["buscar_match"] = (id_usuario, vetor, quantidade)
+    def buscar_match_fake(
+        id_usuario,
+        vetor,
+        quantidade,
+        ids_ignorados=None,
+        incluir_vetor=False,
+    ):
+        chamadas["buscar_match"] = (
+            id_usuario,
+            vetor,
+            quantidade,
+            ids_ignorados,
+            incluir_vetor,
+        )
         return [match]
 
     monkeypatch.setattr(api, "obter_ultimo_vetor_sqlite", lambda usuario: vetores)
     monkeypatch.setattr(api, "extrair_vetores_da_conversa", extrair_vetores_fake)
+    monkeypatch.setattr(
+        api,
+        "perfil_publico_ou_padrao",
+        lambda usuario: {
+            "nome": "Rafaell",
+            "idade": 25,
+            "foto_url": "uploads/profile_images/rafaell/foto.jpg",
+            "descricao": "Bio completa",
+            "localizacao": "Recife",
+            "cargo": "Dev",
+        },
+    )
+    monkeypatch.setattr(api, "listar_ids_indisponiveis_match", lambda usuario: {"user_carmen"})
+    monkeypatch.setattr(api, "obter_perfil_publico", lambda usuario: perfil_maria)
     monkeypatch.setattr(
         api,
         "buscar_melhor_match",
@@ -429,5 +746,18 @@ def test_dar_match_usa_ultimo_vetor_salvo_e_retorna_match(monkeypatch):
 
     resposta = api.calcular_match_final(api.MensagemMatch(texto=""))
 
-    assert chamadas["buscar_match"] == (ADMIN_EMAIL, [0.64, 0.2, 0.96], 1)
-    assert resposta == {"sucesso": True, "match": match}
+    vetor_usado = chamadas["buscar_match"][1]
+    assert chamadas["buscar_match"] == (
+        ADMIN_EMAIL,
+        vetor_usado,
+        20,
+        {"user_carmen"},
+        True,
+    )
+    assert len(vetor_usado) == len(api.achatar_dados_vetoriais(vetores))
+    assert resposta == {
+        "sucesso": True,
+        "match": perfil_maria,
+        "matches": [perfil_maria],
+    }
+    assert "afinidade" not in resposta["match"]

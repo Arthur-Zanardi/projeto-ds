@@ -22,6 +22,8 @@ tmp/
 dist/
 build/
 *.pyc
+uploads/
+assets/uploads/
 
 # --- Segredos e Configurações Pessoais ---
 .env.local

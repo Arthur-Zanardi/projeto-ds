@@ -1,142 +1,56 @@
 import flet as ft
 
 from src.controllers.login_controller import LoginController
+from src.views.app_layout import BG_MUTED, BORDER, CORAL, PINK, TEXT_MAIN, TEXT_MUTED
 
 
 def loginView(page: ft.Page, controller: LoginController) -> ft.View:
     state = {"mode": "login"}
 
-    CORAL = "#FF7F50"
-    PINK = "#FF69B4"
-    BG_INPUT = "#F3F4F6"
-    TEXT_MUTED = "#6B7280"
-    LINE_DIVIDER = "#E5E7EB"
-    TEXT_MAIN = "#111827"
-
     title_text = ft.Text(
         "Bem-vindo de volta",
-        size=30,
+        size=28,
         weight=ft.FontWeight.BOLD,
         color=TEXT_MAIN,
     )
     subtitle_text = ft.Text(
-        "Continue de onde parou e encontre o seu match.",
+        "Continue sua entrevista e descubra conexoes reais.",
         color=TEXT_MUTED,
         size=14,
     )
+    error_text = ft.Text("", color=ft.Colors.RED_500, size=12, visible=False)
 
-    txt_nome = ft.TextField(
-        hint_text="Como voce se chama?",
-        border_radius=16,
-        bgcolor=BG_INPUT,
-        border_color=ft.Colors.TRANSPARENT,
-        focused_border_color=CORAL,
-        text_size=15,
-        height=52,
-        content_padding=16,
-    )
-
-    txt_email = ft.TextField(
-        hint_text="seu@email.com",
-        border_radius=16,
-        bgcolor=BG_INPUT,
-        border_color=ft.Colors.TRANSPARENT,
-        focused_border_color=CORAL,
-        text_size=15,
-        height=52,
-        content_padding=16,
-    )
-
+    txt_email = ft.TextField(hint_text="seu@email.com", border_radius=14)
     txt_senha = ft.TextField(
-        hint_text="********",
+        hint_text="Senha",
         password=True,
         can_reveal_password=True,
-        border_radius=16,
-        bgcolor=BG_INPUT,
-        border_color=ft.Colors.TRANSPARENT,
-        focused_border_color=CORAL,
-        text_size=15,
-        height=52,
-        content_padding=16,
+        border_radius=14,
     )
 
-    name_field = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "Seu nome",
-                    size=12,
-                    weight=ft.FontWeight.W_500,
-                    color=TEXT_MUTED,
-                ),
-                txt_nome,
-            ],
-            spacing=5,
-        ),
-        visible=False,
-        margin=ft.margin.only(bottom=12),
+    register_hint = ft.AnimatedSwitcher(
+        content=ft.Container(),
+        duration=250,
+        reverse_duration=180,
+        transition=ft.AnimatedSwitcherTransition.FADE,
     )
 
-    email_field = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "E-mail",
-                    size=12,
-                    weight=ft.FontWeight.W_500,
-                    color=TEXT_MUTED,
-                ),
-                txt_email,
-            ],
-            spacing=5,
-        ),
-        margin=ft.margin.only(bottom=12),
-    )
-
-    password_field = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "Senha",
-                    size=12,
-                    weight=ft.FontWeight.W_500,
-                    color=TEXT_MUTED,
-                ),
-                txt_senha,
-            ],
-            spacing=5,
-        ),
-        margin=ft.margin.only(bottom=12),
-    )
-
-    forgot_password = ft.Container(
-        content=ft.Text(
-            "Esqueci minha senha",
-            size=13,
-            color=CORAL,
-            weight=ft.FontWeight.W_500,
-        ),
-        alignment=ft.Alignment(1.0, 0.0),
-        visible=True,
-        margin=ft.margin.only(bottom=24),
-    )
-
-    cta_text = ft.Text(
-        "Entrar",
-        color=ft.Colors.WHITE,
-        weight=ft.FontWeight.BOLD,
-        size=16,
-    )
+    cta_text = ft.Text("Entrar", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD, size=16)
     cta_icon = ft.Icon(ft.Icons.ARROW_FORWARD, color=ft.Colors.WHITE, size=20)
+
+    def set_error(message: str):
+        error_text.value = message
+        error_text.visible = bool(message)
+        page.update()
 
     def change_mode(new_mode):
         state["mode"] = new_mode
+        set_error("")
 
         if new_mode == "login":
             title_text.value = "Bem-vindo de volta"
-            subtitle_text.value = "Continue de onde parou e encontre o seu match."
-            name_field.visible = False
-            forgot_password.visible = True
+            subtitle_text.value = "Continue sua entrevista e descubra conexoes reais."
+            register_hint.content = ft.Container()
             cta_text.value = "Entrar"
             cta_icon.name = ft.Icons.ARROW_FORWARD
             login_btn.bgcolor = CORAL
@@ -144,13 +58,28 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
             register_btn.bgcolor = ft.Colors.TRANSPARENT
             register_btn.color = TEXT_MUTED
         else:
-            title_text.value = "Encontre sua conexao"
-            subtitle_text.value = (
-                "Crie sua conta e deixe a IA encontrar quem combina com voce."
+            title_text.value = "Crie sua conta"
+            subtitle_text.value = "Entre com e-mail e senha. Seu perfil publico vem logo depois."
+            register_hint.content = ft.Container(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.PERSON_OUTLINE, color=PINK, size=20),
+                        ft.Text(
+                            "Depois do cadastro voce completa foto, idade, cidade e bio na aba Perfil.",
+                            color=TEXT_MUTED,
+                            size=12,
+                            expand=True,
+                        ),
+                    ],
+                    spacing=10,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                bgcolor="#FFF1F6",
+                border=ft.Border.all(1, "#FFD3E4"),
+                border_radius=14,
+                padding=12,
             )
-            name_field.visible = True
-            forgot_password.visible = False
-            cta_text.value = "Criar conta e iniciar entrevista"
+            cta_text.value = "Criar conta"
             cta_icon.name = ft.Icons.AUTO_AWESOME
             register_btn.bgcolor = CORAL
             register_btn.color = ft.Colors.WHITE
@@ -159,7 +88,7 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
 
         page.update()
 
-    login_btn = ft.ElevatedButton(
+    login_btn = ft.Button(
         content="Entrar",
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
@@ -171,7 +100,7 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
         expand=True,
     )
 
-    register_btn = ft.ElevatedButton(
+    register_btn = ft.Button(
         content="Criar conta",
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=12),
@@ -183,32 +112,18 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
         expand=True,
     )
 
-    tabs_container = ft.Container(
-        content=ft.Row([login_btn, register_btn], spacing=0),
-        bgcolor=BG_INPUT,
-        border_radius=14,
-        padding=4,
-        margin=ft.margin.only(bottom=28),
-    )
-
-    def mostrar_erro(mensagem):
-        page.show_dialog(
-            ft.SnackBar(
-                content=ft.Text(mensagem),
-                bgcolor=ft.Colors.RED_ACCENT,
-            )
-        )
-
-    def autenticar_usuario(usuario):
+    def autenticar_usuario(usuario, rota="/chat"):
         page.usuario_logado = usuario
-        page.go("/chat")
+        page.match_deck = None
+        page.go(rota)
 
     def submeter_formulario(_):
-        email = (txt_email.value or "").strip()
+        set_error("")
+        email = (txt_email.value or "").strip().lower()
         senha = txt_senha.value or ""
 
         if not email or not senha:
-            mostrar_erro("Preencha e-mail e senha.")
+            set_error("Preencha e-mail e senha.")
             return
 
         if state["mode"] == "login":
@@ -216,19 +131,25 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
             if usuario:
                 autenticar_usuario(usuario)
             else:
-                mostrar_erro("E-mail ou senha incorretos.")
+                set_error("E-mail ou senha incorretos.")
             return
 
-        nome = (txt_nome.value or "").strip()
-        if not nome:
-            mostrar_erro("Por favor, preencha o seu nome.")
+        if not controller.realizar_cadastro(
+            email=email,
+            senha_pura=senha,
+        ):
+            set_error("Este e-mail ja esta cadastrado ou os dados sao invalidos.")
             return
 
-        if not controller.realizar_cadastro(nome, email, senha):
-            mostrar_erro("Este e-mail ja esta cadastrado ou os dados sao invalidos.")
-            return
+        autenticar_usuario(controller.realizar_login(email, senha), "/profile")
 
-        autenticar_usuario(controller.realizar_login(email, senha))
+    tabs_container = ft.Container(
+        content=ft.Row([login_btn, register_btn], spacing=0),
+        bgcolor=BG_MUTED,
+        border_radius=14,
+        padding=4,
+        margin=ft.Margin(0, 20, 0, 18),
+    )
 
     cta_button = ft.Container(
         content=ft.Row(
@@ -236,114 +157,60 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
             alignment=ft.MainAxisAlignment.CENTER,
             spacing=10,
         ),
-        gradient=ft.LinearGradient(
-            begin=ft.Alignment(-1.0, 0.0),
-            end=ft.Alignment(1.0, 0.0),
-            colors=[CORAL, PINK],
-        ),
-        height=56,
+        gradient=ft.LinearGradient(colors=[CORAL, PINK]),
+        height=54,
         border_radius=16,
         on_click=submeter_formulario,
-        margin=ft.margin.only(bottom=24),
+        margin=ft.Margin(0, 12, 0, 0),
     )
 
-    divider_row = ft.Row(
-        [
-            ft.Divider(expand=True, color=LINE_DIVIDER, height=1),
-            ft.Text("ou continue com", size=12, color=TEXT_MUTED),
-            ft.Divider(expand=True, color=LINE_DIVIDER, height=1),
-        ],
-        alignment=ft.MainAxisAlignment.CENTER,
-        margin=ft.margin.only(bottom=24),
-    )
-
-    social_buttons = ft.Row(
-        [
-            ft.OutlinedButton(
-                content="Google",
-                icon=ft.Icons.G_MOBILEDATA,
-                style=ft.ButtonStyle(
-                    shape=ft.RoundedRectangleBorder(radius=12),
-                    color=TEXT_MAIN,
-                ),
-                expand=True,
-                height=48,
-            ),
-            ft.OutlinedButton(
-                content="Apple",
-                icon=ft.Icons.APPLE,
-                style=ft.ButtonStyle(
-                    shape=ft.RoundedRectangleBorder(radius=12),
-                    color=TEXT_MAIN,
-                ),
-                expand=True,
-                height=48,
-            ),
-        ],
-        spacing=12,
-        margin=ft.margin.only(bottom=28),
-    )
-
-    terms_text = ft.Text(
-        spans=[
-            ft.TextSpan("Ao continuar, voce concorda com nossos "),
-            ft.TextSpan(
-                "Termos de Uso",
-                ft.TextStyle(color=CORAL, weight=ft.FontWeight.BOLD),
-            ),
-            ft.TextSpan(" e "),
-            ft.TextSpan(
-                "Politica de Privacidade",
-                ft.TextStyle(color=CORAL, weight=ft.FontWeight.BOLD),
-            ),
-        ],
-        size=12,
-        color=TEXT_MUTED,
-        text_align=ft.TextAlign.CENTER,
-    )
-
-    return ft.View(
-        route="/login",
-        padding=24,
-        bgcolor="#FAFAFA",
-        controls=[
-            ft.Container(
-                content=ft.Row(
-                    [
+    form = ft.Container(
+        content=ft.Column(
+            controls=[
+                ft.Row(
+                    controls=[
                         ft.Container(
-                            content=ft.Icon(
-                                ft.Icons.FAVORITE,
-                                color=ft.Colors.WHITE,
-                                size=22,
-                            ),
+                            content=ft.Icon(ft.Icons.FAVORITE, color=ft.Colors.WHITE, size=22),
                             gradient=ft.LinearGradient(colors=[CORAL, PINK]),
                             width=42,
                             height=42,
                             border_radius=14,
-                            alignment=ft.Alignment(0.0, 0.0),
+                            alignment=ft.Alignment(0, 0),
                         ),
-                        ft.Text(
-                            "MatchAi",
-                            size=24,
-                            weight=ft.FontWeight.BOLD,
-                            color=TEXT_MAIN,
-                        ),
+                        ft.Text("Match.AI", size=18, weight=ft.FontWeight.BOLD, color=TEXT_MAIN),
                     ],
-                    spacing=12,
+                    spacing=10,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
-                margin=ft.margin.only(top=30, bottom=36),
-            ),
-            title_text,
-            ft.Container(content=subtitle_text, margin=ft.margin.only(bottom=28)),
-            tabs_container,
-            name_field,
-            email_field,
-            password_field,
-            forgot_password,
-            cta_button,
-            divider_row,
-            social_buttons,
-            ft.Container(content=terms_text, alignment=ft.Alignment(0.0, 0.0)),
-        ],
+                ft.Container(height=10),
+                title_text,
+                subtitle_text,
+                tabs_container,
+                register_hint,
+                txt_email,
+                txt_senha,
+                error_text,
+                cta_button,
+            ],
+            spacing=10,
+        ),
+        bgcolor=ft.Colors.WHITE,
+        border=ft.Border.all(1, BORDER),
+        border_radius=20,
+        padding=22,
+        width=460,
+    )
+
+    return ft.View(
+        route="/login",
+        padding=20,
+        bgcolor="#FAFAFA",
         scroll=ft.ScrollMode.AUTO,
+        controls=[
+            ft.Container(
+                content=form,
+                alignment=ft.Alignment(0, 0),
+                expand=True,
+            )
+        ],
     )
