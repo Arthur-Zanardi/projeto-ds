@@ -16,6 +16,7 @@ dependencies = [
     "flet>=0.84.0",
     "groq>=1.1.1",
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.0.0",
     "python-dotenv>=1.2.2",
     "requests>=2.32.0",
     "chromadb>=1.5.8",

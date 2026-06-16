@@ -1,12 +1,13 @@
 import asyncio
 import logging
-import os
 
 import requests
 
+from src.config import settings
+
 logger = logging.getLogger(__name__)
 
-API_BASE_URL = os.getenv("MATCHAI_API_BASE_URL", "http://127.0.0.1:8000")
+API_BASE_URL = settings.matchai_api_base_url
 
 
 def montar_headers_usuario(usuario_logado: dict | None = None):

@@ -1,22 +1,18 @@
 """Identidade do usuário e helpers de normalização.
 
-Nenhum dado pessoal é fixado no código: administradores e valores
-padrão são lidos do ambiente. Em produção a identidade vem do JWT
-(ver `get_current_user` na API), não destes padrões.
+Nenhum dado pessoal é fixado no código. Administradores vêm de
+`settings.admin_emails_set` (variável ADMIN_EMAILS). Em produção a
+identidade real vem do JWT (ver `get_current_user` na API).
 """
 import os
 
+from src.config import settings
 
-def _emails_do_ambiente(nome_var: str) -> set[str]:
-    brutos = os.getenv(nome_var, "")
-    return {parte.strip().lower() for parte in brutos.split(",") if parte.strip()}
-
-
-# Administradores definidos via ambiente: ADMIN_EMAILS="a@x.com,b@y.com"
-ADMIN_EMAILS = _emails_do_ambiente("ADMIN_EMAILS")
+# Administradores centralizados em settings (ADMIN_EMAILS="a@x.com,b@y.com")
+ADMIN_EMAILS = settings.admin_emails_set
 
 # Padrões legados (sem dados pessoais). Vazios por padrão; mantidos apenas
-# para compatibilidade com a camada de dados até a migração concluir.
+# para compatibilidade com a camada de dados legada até a migração concluir.
 EMAIL_USUARIO_PADRAO = os.getenv("EMAIL_USUARIO_PADRAO", "").strip().lower()
 NOME_USUARIO_PADRAO = os.getenv("NOME_USUARIO_PADRAO", "").strip()
 USUARIO_LEGADO = os.getenv("USUARIO_LEGADO", "").strip().lower()
@@ -26,8 +22,7 @@ def normalizar_email_usuario(email: str | None) -> str:
     """Normaliza um e-mail. Sem e-mail e sem padrão configurado, retorna "".
 
     O comportamento antigo de devolver um e-mail de admin por padrão foi
-    removido por ser uma fonte de impersonação. A identidade real passa a
-    vir do token JWT.
+    removido por ser fonte de impersonação. A identidade real vem do JWT.
     """
     email_normalizado = (email or "").strip().lower()
     return email_normalizado or EMAIL_USUARIO_PADRAO

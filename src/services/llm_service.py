@@ -1,14 +1,13 @@
 """Integração com o LLM (Groq) para conversa e extração de vetores de perfil."""
 import json
 import logging
-import os
 
+from src.config import settings
 from src.schema.schema_vetores import PerfilUsuarioVetorizado
 
 logger = logging.getLogger(__name__)
 
-# Lido do ambiente. Na Fase 1 passa a vir de `src.config.settings`.
-CHAVE_GROQ = os.getenv("GROQ_API_KEY")
+CHAVE_GROQ = settings.groq_api_key
 
 client = None
 
