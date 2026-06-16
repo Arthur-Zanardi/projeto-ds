@@ -2,7 +2,7 @@ import asyncio
 
 import flet as ft
 
-from src.services.api_client import carregar_historico, dar_match
+from src.services.api_client import carregar_historico, criar_match, dar_match
 from src.services.llm_conversation import llm_conversation
 
 
@@ -71,8 +71,10 @@ def chatView(page):
 
             if resultado.get("sucesso"):
                 page.match_result = resultado["match"]
+                await criar_match(resultado["match"])
                 set_match_button_loading(False)
                 navegou_para_match = True
+                page.match_active_tab = "perfis"
                 page.go("/match")
                 return
 
