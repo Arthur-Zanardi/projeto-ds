@@ -7,12 +7,6 @@ from src.services.profile_completion import (
     anexar_status_perfil,
     campos_faltantes_perfil,
 )
-from src.services.profile_images import (
-    ALLOWED_PROFILE_IMAGE_EXTENSIONS,
-    MAX_PROFILE_IMAGE_BYTES,
-    gerar_caminho_upload_imagem,
-    validar_imagem_perfil,
-)
 from src.views.app_layout import (
     BG_MUTED,
     BORDER,
@@ -51,11 +45,9 @@ def _texto_faltantes(campos: list[str]) -> str:
 
 def profileView(page: ft.Page) -> ft.View:
     usuario_logado = getattr(page, "usuario_logado", None) or {}
-    email_usuario = str(usuario_logado.get("email") or "").strip().lower()
 
     state = {
         "foto_url": "",
-        "upload_destino": "",
         "carregando": True,
     }
 
@@ -75,13 +67,10 @@ def profileView(page: ft.Page) -> ft.View:
 
     status_text = ft.Text("Carregando perfil...", size=12, color=TEXT_MUTED)
     completion_text = ft.Text("", size=12, color=TEXT_MUTED)
-    upload_text = ft.Text("PNG, JPG ou WebP ate 16 MB.", size=12, color=TEXT_MUTED)
-    upload_progress = ft.ProgressBar(
-        value=0,
-        color=PINK,
-        bgcolor="#FFE4EC",
-        border_radius=8,
-        visible=False,
+    foto_url_field = ft.TextField(
+        label="Link da foto (URL)",
+        hint_text="https://.../sua-foto.jpg",
+        border_radius=12,
     )
 
     def avatar_placeholder():
@@ -149,6 +138,7 @@ def profileView(page: ft.Page) -> ft.View:
         nome_field.value = perfil.get("nome") or usuario_logado.get("nome", "")
         idade_field.value = "" if perfil.get("idade") is None else str(perfil.get("idade"))
         state["foto_url"] = perfil.get("foto_url") or perfil.get("imagem") or ""
+        foto_url_field.value = state["foto_url"]
         localizacao_field.value = perfil.get("localizacao") or ""
         cargo_field.value = perfil.get("cargo") or ""
         descricao_field.value = perfil.get("descricao") or ""
@@ -160,17 +150,6 @@ def profileView(page: ft.Page) -> ft.View:
         status_text.color = color
         try:
             status_text.update()
-        except (AssertionError, RuntimeError):
-            pass
-
-    def set_upload_status(mensagem, color=TEXT_MUTED, progress_visible=False, progress=0):
-        upload_text.value = mensagem
-        upload_text.color = color
-        upload_progress.visible = progress_visible
-        upload_progress.value = progress
-        try:
-            upload_text.update()
-            upload_progress.update()
         except (AssertionError, RuntimeError):
             pass
 
@@ -210,63 +189,13 @@ def profileView(page: ft.Page) -> ft.View:
     def salvar_clicked(_):
         _executar_tarefa(page, salvar)
 
-    def on_upload(event):
-        if event.error:
-            set_upload_status(f"Falha no envio: {event.error}", ft.Colors.RED_500)
-            return
+    def aplicar_foto_url(_=None):
+        state["foto_url"] = (foto_url_field.value or "").strip()
+        update_avatar()
+        atualizar_completude()
+        page.update()
 
-        progresso = float(event.progress or 0)
-        if progresso >= 1:
-            state["foto_url"] = state.get("upload_destino", "")
-            update_avatar()
-            atualizar_completude()
-            set_upload_status("Foto enviada. Salve o perfil para confirmar.", CORAL)
-            page.update()
-            return
-
-        set_upload_status("Enviando foto...", TEXT_MUTED, progress_visible=True, progress=progresso)
-
-    file_picker = ft.FilePicker(on_upload=on_upload)
-    try:
-        if hasattr(page, "overlay") and file_picker not in page.overlay:
-            page.overlay.append(file_picker)
-    except (AssertionError, RuntimeError, TypeError):
-        pass
-
-    async def escolher_foto():
-        arquivos = await file_picker.pick_files(
-            dialog_title="Escolha uma foto de perfil",
-            file_type=ft.FilePickerFileType.IMAGE,
-            allowed_extensions=list(ALLOWED_PROFILE_IMAGE_EXTENSIONS),
-            allow_multiple=False,
-            with_data=False,
-        )
-        if not arquivos:
-            return
-
-        arquivo = arquivos[0]
-        valido, mensagem = validar_imagem_perfil(arquivo.name, arquivo.size)
-        if not valido:
-            set_upload_status(mensagem, ft.Colors.RED_500)
-            page.update()
-            return
-
-        destino = gerar_caminho_upload_imagem(email_usuario, arquivo.name)
-        state["upload_destino"] = destino
-        set_upload_status("Preparando envio...", TEXT_MUTED, progress_visible=True, progress=0)
-        upload_url = page.get_upload_url(destino, 600)
-        await file_picker.upload(
-            [
-                ft.FilePickerUploadFile(
-                    upload_url=upload_url,
-                    id=arquivo.id,
-                    name=arquivo.name,
-                )
-            ]
-        )
-
-    def escolher_foto_clicked(_):
-        _executar_tarefa(page, escolher_foto)
+    foto_url_field.on_change = aplicar_foto_url
 
     for field in (nome_field, idade_field, localizacao_field, cargo_field, descricao_field):
         field.on_change = lambda _: (atualizar_completude(), page.update())
@@ -277,16 +206,9 @@ def profileView(page: ft.Page) -> ft.View:
         content=ft.Column(
             controls=[
                 avatar_switcher,
-                ft.FilledButton(
-                    content="Selecionar foto",
-                    icon=ft.Icons.UPLOAD_FILE,
-                    on_click=escolher_foto_clicked,
-                    style=ft.ButtonStyle(bgcolor=PINK, color=ft.Colors.WHITE),
-                ),
-                upload_text,
-                upload_progress,
+                foto_url_field,
                 ft.Text(
-                    f"Limite: {MAX_PROFILE_IMAGE_BYTES // (1024 * 1024)} MB.",
+                    "Cole o link de uma imagem (jpg, png ou webp).",
                     size=11,
                     color=TEXT_MUTED,
                     text_align=ft.TextAlign.CENTER,

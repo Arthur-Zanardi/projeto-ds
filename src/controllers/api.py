@@ -75,7 +75,7 @@ async def lifespan(app: FastAPI):
     settings.validar_obrigatorias()
     # O esquema é criado/evoluído apenas via Alembic (entrypoint), nunca por request.
     # Em dev, opcionalmente popula perfis mock.
-    if not settings.is_prod and settings.seed_on_startup:
+    if settings.seed_on_startup:
         try:
             from scripts.seed import popular_perfis_mock
 
