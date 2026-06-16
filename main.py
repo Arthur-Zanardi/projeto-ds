@@ -5,7 +5,7 @@ import flet as ft
 
 from src.controllers.login_controller import LoginController
 from src.services.profile_images import MAX_PROFILE_IMAGE_BYTES
-from src.services.sqlite_db import SQLiteUserRepository
+from src.services.postgres_db import PostgresUserRepository
 from src.views.chat_match_view import matchChatView
 from src.views.chat_view import chatView
 from src.views.conversations_view import conversationsView
@@ -25,7 +25,7 @@ async def main(page: ft.Page):
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.padding = 0
 
-    usuario_repo = SQLiteUserRepository()
+    usuario_repo = PostgresUserRepository()
     autenticacao_controller = LoginController(usuario_repo)
 
     def usuario_autenticado():

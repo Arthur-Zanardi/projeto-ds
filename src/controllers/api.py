@@ -16,7 +16,6 @@ from src.services.database import (
     calcular_dimensoes_mais_proximas,
     criar_vetor_mock_padrao,
     obter_vetor_usuario,
-    popular_banco_mock,
     salvar_perfil_usuario,
     salvar_perfil_vetorial,
 )
@@ -30,10 +29,9 @@ from src.services.profile_completion import (
     campos_faltantes_perfil,
     perfil_publico_completo,
 )
-from src.services.sqlite_db import (
+from src.services.postgres_db import (
     confirmar_match,
     criar_match_usuario,
-    iniciar_banco_sqlite,
     listar_ids_indisponiveis_match,
     listar_matches_usuario,
     listar_perfis_publicos,
@@ -64,8 +62,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    iniciar_banco_sqlite()
-    popular_banco_mock()
+    # O esquema do banco é criado/evoluído apenas via Alembic.
+    # O seed de perfis mock é feito pelo entrypoint/scripts (dev).
     yield
 
 

@@ -11,15 +11,20 @@ authors = [
     {name = "Rafaell Bezerra Saraiva", email = "rbs10@cin.ufpe.br"},
 ]
 dependencies = [
-    "bcrypt>=5.0.0",
     "fastapi>=0.115.0",
-    "flet>=0.84.0",
-    "groq>=1.1.1",
+    "uvicorn[standard]>=0.30.0",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.2.2",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "psycopg[binary]>=3.1.0",
+    "pgvector>=0.2.5",
+    "bcrypt>=5.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "groq>=1.1.1",
     "requests>=2.32.0",
-    "chromadb>=1.5.8",
+    "flet>=0.84.0",
 ]
 requires-python = ">=3.10"
 
