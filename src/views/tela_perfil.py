@@ -6,7 +6,6 @@ from src.services.api_client import carregar_perfil_publico, salvar_perfil_publi
 from src.services.profile_completion import (
     anexar_status_perfil,
     campos_faltantes_perfil,
-    perfil_publico_completo,
 )
 from src.services.profile_images import (
     ALLOWED_PROFILE_IMAGE_EXTENSIONS,

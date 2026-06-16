@@ -41,7 +41,6 @@ from src.services.postgres_db import (
     criar_match_usuario,
     listar_ids_indisponiveis_match,
     listar_matches_usuario,
-    listar_perfis_publicos,
     obter_acao_match,
     obter_historico_chat,
     obter_historico_match,

@@ -11,7 +11,6 @@ from src.services.api_client import (
 from src.services.profile_completion import campos_faltantes_perfil, perfil_publico_completo
 from src.services.user_context import usuario_eh_admin
 from src.views.app_layout import (
-    BG_MAIN,
     BG_MUTED,
     BORDER,
     CORAL,

@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("flet")
+
 from src.views.match_view import matchView, montar_perfil_match
 
 

@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("flet")
+
 from src.views.tela_perfil import profileView
 from src.services.profile_completion import campos_faltantes_perfil, perfil_publico_completo
 from src.services.profile_images import (
