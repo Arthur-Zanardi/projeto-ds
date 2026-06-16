@@ -21,6 +21,7 @@ from src.views.match_view import (
 
 
 def matchChatView(page, match_name=None, match_id=None):
+    usuario_logado = getattr(page, "usuario_logado", None)
     match_result = getattr(page, "match_result", {}) or {}
     if match_name:
         match_result["nome"] = match_name
@@ -134,7 +135,7 @@ def matchChatView(page, match_name=None, match_id=None):
         if state["match_salvo"]:
             return True
 
-        resultado = await criar_match(perfil_para_payload(perfil))
+        resultado = await criar_match(perfil_para_payload(perfil), usuario_logado)
         if resultado.get("sucesso"):
             state["match_salvo"] = True
             return True
@@ -151,7 +152,7 @@ def matchChatView(page, match_name=None, match_id=None):
             state["carregando"] = False
             return
 
-        historico = await carregar_historico_match(match_id_ativo)
+        historico = await carregar_historico_match(match_id_ativo, usuario_logado)
         messages_view.controls.clear()
 
         if historico:
@@ -164,7 +165,12 @@ def matchChatView(page, match_name=None, match_id=None):
                 "para conversar."
             )
             add_message(saudacao, is_me=False)
-            await salvar_mensagem_match(match_id_ativo, saudacao, "match")
+            await salvar_mensagem_match(
+                match_id_ativo,
+                saudacao,
+                "match",
+                usuario_logado,
+            )
             set_status("Conversa iniciada e salva no banco.", CORAL)
 
         state["carregando"] = False
@@ -177,6 +183,7 @@ def matchChatView(page, match_name=None, match_id=None):
             match_id_ativo,
             texto_usuario,
             "usuario",
+            usuario_logado,
         )
         if not resultado.get("sucesso"):
             set_status(resultado.get("mensagem", "Falha ao salvar mensagem."), ft.Colors.RED_500)
@@ -188,6 +195,7 @@ def matchChatView(page, match_name=None, match_id=None):
             match_id_ativo,
             resposta,
             "match",
+            usuario_logado,
         )
 
         if resposta_salva.get("sucesso"):

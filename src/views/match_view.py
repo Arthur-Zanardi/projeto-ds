@@ -5,6 +5,7 @@ import uuid
 import flet as ft
 
 from src.services.api_client import criar_match, listar_matches
+from src.services.user_context import usuario_eh_admin
 
 
 CORAL = "#FF7F50"
@@ -171,6 +172,13 @@ def slugify(texto: str):
 
 
 def matchView(page):
+    usuario_logado = getattr(page, "usuario_logado", None)
+    email_usuario = (
+        usuario_logado.get("email")
+        if isinstance(usuario_logado, dict)
+        else None
+    )
+    is_admin = usuario_eh_admin(email_usuario)
     perfis = obter_perfis_mock(page)
     match_inicial = montar_perfil_match(getattr(page, "match_result", None))
     selected_id = match_inicial.get("id")
@@ -453,6 +461,13 @@ def matchView(page):
         selecionar_perfil(ids[(indice + 1) % len(ids)])
 
     def adicionar_perfil(_):
+        if not is_admin:
+            set_status(
+                "Apenas administradores podem criar perfis mock.",
+                ft.Colors.RED_500,
+            )
+            return
+
         nome = (nome_field.value or "").strip()
         if not nome:
             set_status("Preencha pelo menos o nome do perfil.", ft.Colors.RED_500)
@@ -485,6 +500,7 @@ def matchView(page):
             "tracos": tracos,
             "afinidade": (afinidade_field.value or "94%").strip(),
             "imagem": (foto_field.value or PERFIL_PADRAO["imagem"]).strip(),
+            "mock_customizado": True,
             "respostas": [
                 "Gostei desse comeco. Me conta mais sobre voce.",
                 "Esse assunto combina com o perfil que voce montou para mim.",
@@ -564,7 +580,7 @@ def matchView(page):
 
     async def salvar_match_async(perfil, abrir_chat=False):
         set_status(f"Salvando match com {perfil['nome']}...")
-        resultado = await criar_match(perfil_para_payload(perfil))
+        resultado = await criar_match(perfil_para_payload(perfil), usuario_logado)
 
         if not resultado.get("sucesso"):
             set_status(resultado.get("mensagem", "Nao foi possivel salvar."), ft.Colors.RED_500)
@@ -737,12 +753,16 @@ def matchView(page):
 
     def render_perfis():
         perfil = perfil_atual()
+        controls = [
+            render_lista_perfis(),
+            render_card_perfil(perfil),
+        ]
+
+        if is_admin:
+            controls.append(render_formulario_custom())
+
         return ft.Column(
-            controls=[
-                render_lista_perfis(),
-                render_card_perfil(perfil),
-                render_formulario_custom(),
-            ],
+            controls=controls,
             spacing=16,
         )
 
@@ -759,7 +779,7 @@ def matchView(page):
         if renderizar:
             render()
 
-        state["matches_salvos"] = await listar_matches()
+        state["matches_salvos"] = await listar_matches(usuario_logado)
         state["carregando_matches"] = False
 
         if renderizar:

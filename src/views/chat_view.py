@@ -2,12 +2,17 @@ import asyncio
 
 import flet as ft
 
-from src.services.api_client import carregar_historico, criar_match, dar_match
-from src.services.llm_conversation import llm_conversation
+from src.services.api_client import (
+    carregar_historico,
+    criar_match,
+    dar_match,
+    enviar_mensagem_chat,
+)
 
 
 def chatView(page):
     mensagens_usuario = []
+    usuario_logado = getattr(page, "usuario_logado", None)
 
     def goto_profile_screen(_):
         page.go("/profile")
@@ -58,20 +63,31 @@ def chatView(page):
 
         receive_message(texto_usuario)
 
-    def receive_message(texto_enviado):
-        response = llm_conversation(texto_enviado)
+    async def receive_message_async(texto_enviado):
+        response = await enviar_mensagem_chat(texto_enviado, usuario_logado)
         add_message(response, is_me=False)
+
+    def receive_message(texto_enviado):
+        if hasattr(page, "run_task"):
+            page.run_task(receive_message_async, texto_enviado)
+        else:
+            try:
+                asyncio.get_running_loop().create_task(
+                    receive_message_async(texto_enviado)
+                )
+            except RuntimeError:
+                pass
 
     async def match_clicked_async():
         set_match_button_loading(True)
         navegou_para_match = False
 
         try:
-            resultado = await dar_match(mensagens_usuario)
+            resultado = await dar_match(mensagens_usuario, usuario_logado)
 
             if resultado.get("sucesso"):
                 page.match_result = resultado["match"]
-                await criar_match(resultado["match"])
+                await criar_match(resultado["match"], usuario_logado)
                 set_match_button_loading(False)
                 navegou_para_match = True
                 page.match_active_tab = "perfis"
@@ -137,7 +153,7 @@ def chatView(page):
     )
 
     async def load_saved_messages():
-        historico = await carregar_historico()
+        historico = await carregar_historico(usuario_logado)
 
         for item in historico:
             remetente = item.get("remetente")

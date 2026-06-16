@@ -7,6 +7,11 @@ from pathlib import Path
 import bcrypt
 
 from src.services.interfaces import IUserRepository
+from src.services.user_context import (
+    EMAIL_USUARIO_PADRAO,
+    USUARIO_LEGADO,
+    normalizar_email_usuario,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -105,6 +110,74 @@ def iniciar_banco_sqlite():
         )
     """)
 
+    _migrar_usuario_legado_sqlite(cursor)
+
+    conn.commit()
+    conn.close()
+
+
+def _migrar_usuario_legado_sqlite(
+    cursor,
+    origem: str = USUARIO_LEGADO,
+    destino: str = EMAIL_USUARIO_PADRAO,
+):
+    destino = normalizar_email_usuario(destino)
+
+    if origem == destino:
+        return
+
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO matches_usuario
+        (usuario, match_id, nome, afinidade, dados_match_json, data_hora)
+        SELECT ?, match_id, nome, afinidade, dados_match_json, data_hora
+        FROM matches_usuario
+        WHERE usuario = ?
+        """,
+        (destino, origem),
+    )
+
+    cursor.execute(
+        """
+        UPDATE mensagens_match
+        SET usuario = ?
+        WHERE usuario = ?
+        """,
+        (destino, origem),
+    )
+
+    cursor.execute(
+        """
+        DELETE FROM matches_usuario
+        WHERE usuario = ?
+        """,
+        (origem,),
+    )
+
+    for tabela in (
+        "historico_chat",
+        "vetores_salvos",
+        "logs_api",
+    ):
+        cursor.execute(
+            f"""
+            UPDATE {tabela}
+            SET usuario = ?
+            WHERE usuario = ?
+            """,
+            (destino, origem),
+        )
+
+
+def migrar_usuario_legado_sqlite(
+    origem: str = USUARIO_LEGADO,
+    destino: str = EMAIL_USUARIO_PADRAO,
+):
+    iniciar_banco_sqlite()
+
+    conn = conectar()
+    cursor = conn.cursor()
+    _migrar_usuario_legado_sqlite(cursor, origem=origem, destino=destino)
     conn.commit()
     conn.close()
 
@@ -242,7 +315,7 @@ def obter_match_usuario(usuario: str, match_id: str):
     return match
 
 
-def listar_matches_usuario(usuario: str = "user_rafaell"):
+def listar_matches_usuario(usuario: str = EMAIL_USUARIO_PADRAO):
     iniciar_banco_sqlite()
 
     conn = conectar()
@@ -354,7 +427,7 @@ def salvar_vetores_sqlite(usuario: str, vetores_dict: dict):
     logger.info("Vetores salvos no SQLite para usuario: %s", usuario)
 
 
-def obter_ultimo_vetor_sqlite(usuario: str = "user_rafaell"):
+def obter_ultimo_vetor_sqlite(usuario: str = EMAIL_USUARIO_PADRAO):
     iniciar_banco_sqlite()
 
     conn = conectar()
@@ -380,7 +453,7 @@ def obter_ultimo_vetor_sqlite(usuario: str = "user_rafaell"):
     return json.loads(resultado[0])
 
 
-def obter_historico_chat(usuario: str = "user_rafaell"):
+def obter_historico_chat(usuario: str = EMAIL_USUARIO_PADRAO):
     iniciar_banco_sqlite()
 
     conn = conectar()
@@ -452,7 +525,7 @@ def registrar_log_api(
     )
 
 
-def obter_logs_api(usuario: str = "user_rafaell"):
+def obter_logs_api(usuario: str = EMAIL_USUARIO_PADRAO):
     iniciar_banco_sqlite()
 
     conn = conectar()

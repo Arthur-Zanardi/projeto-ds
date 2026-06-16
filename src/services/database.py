@@ -1,3 +1,10 @@
+from src.services.user_context import (
+    EMAIL_USUARIO_PADRAO,
+    USUARIO_LEGADO,
+    normalizar_email_usuario,
+)
+
+
 VALOR_NEUTRO = 0.5
 MINIMO_DIMENSOES_COMPARADAS = 3
 
@@ -104,9 +111,13 @@ def buscar_melhor_match(
     embeddings_encontrados = resultados.get("embeddings", [[]])[0]
     metadados_encontrados = resultados.get("metadatas", [[]])[0]
     matches_reais = []
+    ids_ignorados = {id_usuario_buscando}
+
+    if normalizar_email_usuario(id_usuario_buscando) == EMAIL_USUARIO_PADRAO:
+        ids_ignorados.add(USUARIO_LEGADO)
 
     for i, id_encontrado in enumerate(ids_encontrados):
-        if id_encontrado == id_usuario_buscando:
+        if id_encontrado in ids_ignorados:
             continue
 
         if i >= len(embeddings_encontrados):

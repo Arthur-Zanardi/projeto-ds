@@ -119,6 +119,37 @@ def test_buscar_melhor_match_descarta_candidato_sem_dimensoes_suficientes(monkey
     assert resultado == []
 
 
+def test_buscar_melhor_match_ignora_usuario_legado_do_admin(monkeypatch):
+    colecao = ColecaoFake(
+        resultado_query={
+            "ids": [["user_rafaell", "user_maria"]],
+            "embeddings": [[
+                [0.1, 0.60, 0.86, 0.5, 0.7],
+                [0.1, 0.60, 0.86, 0.5, 0.7],
+            ]],
+            "distances": [[0.01, 0.02]],
+            "metadatas": [[{"nome": "Rafaell"}, {"nome": "Maria"}]],
+        }
+    )
+    monkeypatch.setattr(database, "colecao_usuarios", colecao)
+
+    resultado = database.buscar_melhor_match(
+        "rafaellapipucos@gmail.com",
+        [0.5, 0.64, 0.96, 0.2, 0.4],
+        quantidade=1,
+    )
+
+    assert resultado == [
+        {
+            "id": "user_maria",
+            "nome": "Maria",
+            "afinidade": "85.3%",
+            "distancia_matematica": 0.1467,
+            "dimensoes_comparadas": 3,
+        }
+    ]
+
+
 def test_popular_banco_mock_cria_mocks_faltantes_mesmo_com_banco_existente(monkeypatch):
     colecao = ColecaoFake(resultado_get={"ids": ["user_rafaell", "user_maria"]})
     monkeypatch.setattr(database, "colecao_usuarios", colecao)

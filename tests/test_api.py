@@ -4,6 +4,21 @@ from src.controllers import api
 from src.services import sqlite_db
 
 
+ADMIN_EMAIL = "rafaellapipucos@gmail.com"
+HEADERS_ADMIN = {
+    "X-Usuario-Email": ADMIN_EMAIL,
+    "X-Usuario-Nome": "Rafaell",
+}
+HEADERS_FELLIPE = {
+    "X-Usuario-Email": "fellipe@example.com",
+    "X-Usuario-Nome": "Fellipe",
+}
+HEADERS_FERNANDO = {
+    "X-Usuario-Email": "fernando@example.com",
+    "X-Usuario-Nome": "Fernando",
+}
+
+
 def desativar_logs(monkeypatch):
     monkeypatch.setattr(api, "registrar_evento", lambda **kwargs: None)
 
@@ -51,23 +66,23 @@ def test_chat_salva_mensagem_do_usuario_e_resposta_da_ia(monkeypatch):
 
     assert resposta == {"resposta": "Resposta da IA", "perfil_atualizado": True}
     assert mensagens_salvas == [
-        {
-            "usuario": "user_rafaell",
-            "remetente": "usuario",
-            "mensagem": "Oi",
-        },
-        {
-            "usuario": "user_rafaell",
-            "remetente": "ia",
-            "mensagem": "Resposta da IA",
-        },
-    ]
+            {
+                "usuario": ADMIN_EMAIL,
+                "remetente": "usuario",
+                "mensagem": "Oi",
+            },
+            {
+                "usuario": ADMIN_EMAIL,
+                "remetente": "ia",
+                "mensagem": "Resposta da IA",
+            },
+        ]
     assert chamadas["texto_extraido"] == "Oi"
     assert chamadas["vetores_salvos"] == {
-        "usuario": "user_rafaell",
+        "usuario": ADMIN_EMAIL,
         "vetores_dict": vetores,
     }
-    assert chamadas["perfil_salvo"] == ("user_rafaell", "Rafaell", vetores)
+    assert chamadas["perfil_salvo"] == (ADMIN_EMAIL, "Rafaell", vetores)
 
 
 def test_historico_retorna_mensagens_salvas(monkeypatch):
@@ -149,6 +164,123 @@ def test_matches_criam_listam_e_mantem_mensagens_separadas(
             {"remetente": "match", "mensagem": "Tudo bem?"},
         ],
     }
+
+
+def test_historico_matches_e_mensagens_sao_separados_por_email(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    vetores = {
+        "psicologico": {"extroversao": 0.64},
+        "valores": {"religiosidade": 0.2},
+        "interesses": {"musica": 0.96},
+    }
+
+    monkeypatch.setattr(api, "gerar_resposta_ia", lambda texto: f"IA: {texto}")
+    monkeypatch.setattr(api, "extrair_vetores_da_conversa", lambda texto: vetores)
+    monkeypatch.setattr(api, "salvar_perfil_usuario", lambda *args: [0.64, 0.2, 0.96])
+    client = TestClient(api.app)
+
+    client.post("/chat", headers=HEADERS_FELLIPE, json={"texto": "Oi Fellipe"})
+    client.post("/chat", headers=HEADERS_FERNANDO, json={"texto": "Oi Fernando"})
+
+    historico_fellipe = client.get(
+        "/historico",
+        headers=HEADERS_FELLIPE,
+    ).json()["historico"]
+    historico_fernando = client.get(
+        "/historico",
+        headers=HEADERS_FERNANDO,
+    ).json()["historico"]
+
+    assert historico_fellipe == [
+        {"remetente": "usuario", "mensagem": "Oi Fellipe"},
+        {"remetente": "ia", "mensagem": "IA: Oi Fellipe"},
+    ]
+    assert historico_fernando == [
+        {"remetente": "usuario", "mensagem": "Oi Fernando"},
+        {"remetente": "ia", "mensagem": "IA: Oi Fernando"},
+    ]
+
+    client.post(
+        "/matches",
+        headers=HEADERS_FELLIPE,
+        json={"id": "user_maria", "nome": "Maria"},
+    )
+    client.post(
+        "/matches",
+        headers=HEADERS_FERNANDO,
+        json={"id": "user_joao", "nome": "Joao"},
+    )
+    client.post(
+        "/matches/user_maria/mensagens",
+        headers=HEADERS_FELLIPE,
+        json={"mensagem": "Oi, Maria"},
+    )
+    client.post(
+        "/matches/user_joao/mensagens",
+        headers=HEADERS_FERNANDO,
+        json={"mensagem": "Oi, Joao"},
+    )
+
+    matches_fellipe = client.get(
+        "/matches",
+        headers=HEADERS_FELLIPE,
+    ).json()["matches"]
+    matches_fernando = client.get(
+        "/matches",
+        headers=HEADERS_FERNANDO,
+    ).json()["matches"]
+
+    assert [match["match_id"] for match in matches_fellipe] == ["user_maria"]
+    assert [match["match_id"] for match in matches_fernando] == ["user_joao"]
+    assert client.get(
+        "/matches/user_maria/mensagens",
+        headers=HEADERS_FELLIPE,
+    ).json()["mensagens"] == [
+        {"remetente": "usuario", "mensagem": "Oi, Maria"},
+    ]
+    assert client.get(
+        "/matches/user_joao/mensagens",
+        headers=HEADERS_FERNANDO,
+    ).json()["mensagens"] == [
+        {"remetente": "usuario", "mensagem": "Oi, Joao"},
+    ]
+
+
+def test_criar_mock_customizado_exige_admin(
+    tmp_path,
+    monkeypatch,
+):
+    desativar_logs(monkeypatch)
+    monkeypatch.setattr(sqlite_db, "DB_PATH", tmp_path / "teste.db")
+    client = TestClient(api.app)
+    payload = {
+        "id": "custom_luna",
+        "nome": "Luna",
+        "dados_match": {"mock_customizado": True},
+    }
+
+    resposta_comum = client.post(
+        "/matches",
+        headers=HEADERS_FELLIPE,
+        json=payload,
+    )
+    resposta_admin = client.post(
+        "/matches",
+        headers=HEADERS_ADMIN,
+        json=payload,
+    )
+
+    assert resposta_comum.status_code == 403
+    assert resposta_comum.json() == {
+        "detail": "Apenas administradores podem criar perfis mock."
+    }
+    assert resposta_admin.status_code == 201
+    assert resposta_admin.json()["match"]["usuario"] == ADMIN_EMAIL
+    assert resposta_admin.json()["match"]["match_id"] == "custom_luna"
 
 
 def test_mensagens_de_match_inexistente_retornam_404(
@@ -297,5 +429,5 @@ def test_dar_match_usa_ultimo_vetor_salvo_e_retorna_match(monkeypatch):
 
     resposta = api.calcular_match_final(api.MensagemMatch(texto=""))
 
-    assert chamadas["buscar_match"] == ("user_rafaell", [0.64, 0.2, 0.96], 1)
+    assert chamadas["buscar_match"] == (ADMIN_EMAIL, [0.64, 0.2, 0.96], 1)
     assert resposta == {"sucesso": True, "match": match}

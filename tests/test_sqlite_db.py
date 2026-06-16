@@ -7,6 +7,9 @@ from src.controllers.login_controller import LoginController
 from src.services import sqlite_db
 
 
+ADMIN_EMAIL = "rafaellapipucos@gmail.com"
+
+
 def test_iniciar_banco_sqlite_cria_tabelas(tmp_path, monkeypatch):
     banco_teste = tmp_path / "teste.db"
     monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
@@ -265,3 +268,134 @@ def test_sqlite_user_repository_cria_e_autentica_usuario(tmp_path, monkeypatch):
 
     assert controller.realizar_login("ana@email.com", "segredo")["nome"] == "Ana"
     assert controller.realizar_login("ana@email.com", "senha-errada") is None
+
+
+def test_migrar_usuario_legado_mescla_matches_sem_apagar_mensagens(
+    tmp_path,
+    monkeypatch,
+):
+    banco_teste = tmp_path / "teste.db"
+    monkeypatch.setattr(sqlite_db, "DB_PATH", banco_teste)
+
+    sqlite_db.iniciar_banco_sqlite()
+    conn = sqlite3.connect(banco_teste)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO historico_chat
+        (usuario, remetente, mensagem, data_hora)
+        VALUES ('user_rafaell', 'usuario', 'Oi legado', '2026-01-01')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO vetores_salvos
+        (usuario, vetores_json, data_hora)
+        VALUES ('user_rafaell', '{"psicologico": {}}', '2026-01-01')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO logs_api
+        (usuario, endpoint, acao, status, mensagem, data_hora)
+        VALUES ('user_rafaell', '/chat', 'teste', 'sucesso', 'ok', '2026-01-01')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO matches_usuario
+        (usuario, match_id, nome, afinidade, dados_match_json, data_hora)
+        VALUES (?, 'user_maria', 'Maria destino', '90%', NULL, '2026-01-01')
+        """,
+        (ADMIN_EMAIL,),
+    )
+    cursor.execute(
+        """
+        INSERT INTO matches_usuario
+        (usuario, match_id, nome, afinidade, dados_match_json, data_hora)
+        VALUES ('user_rafaell', 'user_maria', 'Maria legado', '85%', NULL, '2026-01-01')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO matches_usuario
+        (usuario, match_id, nome, afinidade, dados_match_json, data_hora)
+        VALUES ('user_rafaell', 'user_carmen', 'Carmen legado', '80%', NULL, '2026-01-01')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO mensagens_match
+        (usuario, match_id, remetente, mensagem, data_hora)
+        VALUES ('user_rafaell', 'user_maria', 'usuario', 'Oi Maria legado', '2026-01-01')
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO mensagens_match
+        (usuario, match_id, remetente, mensagem, data_hora)
+        VALUES ('user_rafaell', 'user_carmen', 'usuario', 'Oi Carmen legado', '2026-01-01')
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    sqlite_db.migrar_usuario_legado_sqlite()
+    sqlite_db.migrar_usuario_legado_sqlite()
+
+    conn = sqlite3.connect(banco_teste)
+    usuarios_legados = list(
+        conn.execute(
+            """
+            SELECT usuario FROM historico_chat WHERE usuario = 'user_rafaell'
+            UNION ALL
+            SELECT usuario FROM matches_usuario WHERE usuario = 'user_rafaell'
+            UNION ALL
+            SELECT usuario FROM mensagens_match WHERE usuario = 'user_rafaell'
+            UNION ALL
+            SELECT usuario FROM vetores_salvos WHERE usuario = 'user_rafaell'
+            UNION ALL
+            SELECT usuario FROM logs_api WHERE usuario = 'user_rafaell'
+            """
+        )
+    )
+    matches_admin = list(
+        conn.execute(
+            """
+            SELECT match_id, nome
+            FROM matches_usuario
+            WHERE usuario = ?
+            ORDER BY match_id
+            """,
+            (ADMIN_EMAIL,),
+        )
+    )
+    mensagens_admin = list(
+        conn.execute(
+            """
+            SELECT match_id, mensagem
+            FROM mensagens_match
+            WHERE usuario = ?
+            ORDER BY match_id, id
+            """,
+            (ADMIN_EMAIL,),
+        )
+    )
+    historico_admin = list(
+        conn.execute(
+            "SELECT mensagem FROM historico_chat WHERE usuario = ?",
+            (ADMIN_EMAIL,),
+        )
+    )
+    conn.close()
+
+    assert usuarios_legados == []
+    assert matches_admin == [
+        ("user_carmen", "Carmen legado"),
+        ("user_maria", "Maria destino"),
+    ]
+    assert mensagens_admin == [
+        ("user_carmen", "Oi Carmen legado"),
+        ("user_maria", "Oi Maria legado"),
+    ]
+    assert historico_admin == [("Oi legado",)]

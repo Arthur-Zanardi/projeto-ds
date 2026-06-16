@@ -6,13 +6,31 @@ import requests
 API_BASE_URL = "http://127.0.0.1:8000"
 
 
-async def enviar_mensagem_chat(texto: str) -> str:
+def montar_headers_usuario(usuario_logado: dict | None = None):
+    if not isinstance(usuario_logado, dict):
+        return {}
+
+    email = str(usuario_logado.get("email") or "").strip().lower()
+    nome = str(usuario_logado.get("nome") or "").strip()
+    headers = {}
+
+    if email:
+        headers["X-Usuario-Email"] = email
+
+    if nome:
+        headers["X-Usuario-Nome"] = nome
+
+    return headers
+
+
+async def enviar_mensagem_chat(texto: str, usuario_logado: dict | None = None) -> str:
     try:
         resposta_api = await asyncio.to_thread(
             requests.post,
             f"{API_BASE_URL}/chat",
             timeout=15,
             json={"texto": texto},
+            headers=montar_headers_usuario(usuario_logado),
         )
 
         if resposta_api.status_code == 200:
@@ -27,12 +45,13 @@ async def enviar_mensagem_chat(texto: str) -> str:
         return f"Erro de conexao com o servidor local: {ex}. A API esta rodando?"
 
 
-async def carregar_historico():
+async def carregar_historico(usuario_logado: dict | None = None):
     try:
         resposta = await asyncio.to_thread(
             requests.get,
             f"{API_BASE_URL}/historico",
             timeout=5,
+            headers=montar_headers_usuario(usuario_logado),
         )
 
         if resposta.status_code == 200:
@@ -45,7 +64,10 @@ async def carregar_historico():
         return []
 
 
-async def dar_match(historico_mensagens: list[str]):
+async def dar_match(
+    historico_mensagens: list[str],
+    usuario_logado: dict | None = None,
+):
     try:
         historico_completo = "\n".join(historico_mensagens)
 
@@ -54,6 +76,7 @@ async def dar_match(historico_mensagens: list[str]):
             f"{API_BASE_URL}/dar_match",
             timeout=45,
             json={"texto": historico_completo},
+            headers=montar_headers_usuario(usuario_logado),
         )
 
         dados = resposta.json()
@@ -77,12 +100,13 @@ async def dar_match(historico_mensagens: list[str]):
         }
 
 
-async def listar_matches():
+async def listar_matches(usuario_logado: dict | None = None):
     try:
         resposta = await asyncio.to_thread(
             requests.get,
             f"{API_BASE_URL}/matches",
             timeout=5,
+            headers=montar_headers_usuario(usuario_logado),
         )
 
         if resposta.status_code == 200:
@@ -94,7 +118,7 @@ async def listar_matches():
         return []
 
 
-async def criar_match(match: dict):
+async def criar_match(match: dict, usuario_logado: dict | None = None):
     match_id = str(match.get("match_id") or match.get("id") or "").strip()
     nome = str(match.get("nome") or "Seu Match").strip()
 
@@ -119,6 +143,7 @@ async def criar_match(match: dict):
             f"{API_BASE_URL}/matches",
             timeout=8,
             json=payload,
+            headers=montar_headers_usuario(usuario_logado),
         )
 
         if resposta.status_code in (200, 201):
@@ -135,12 +160,16 @@ async def criar_match(match: dict):
         }
 
 
-async def carregar_historico_match(match_id: str):
+async def carregar_historico_match(
+    match_id: str,
+    usuario_logado: dict | None = None,
+):
     try:
         resposta = await asyncio.to_thread(
             requests.get,
             f"{API_BASE_URL}/matches/{match_id}/mensagens",
             timeout=5,
+            headers=montar_headers_usuario(usuario_logado),
         )
 
         if resposta.status_code == 200:
@@ -156,6 +185,7 @@ async def salvar_mensagem_match(
     match_id: str,
     mensagem: str,
     remetente: str = "usuario",
+    usuario_logado: dict | None = None,
 ):
     try:
         resposta = await asyncio.to_thread(
@@ -163,6 +193,7 @@ async def salvar_mensagem_match(
             f"{API_BASE_URL}/matches/{match_id}/mensagens",
             timeout=8,
             json={"mensagem": mensagem, "remetente": remetente},
+            headers=montar_headers_usuario(usuario_logado),
         )
 
         if resposta.status_code in (200, 201):
