@@ -4,10 +4,14 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from src.config import settings
+from src.services.db import verificar_conexao
 
 from src.services.conversation_starters import gerar_sugestoes_inicio
 from src.services.database import (
@@ -59,14 +63,26 @@ from src.services.user_context import (
 )
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO if settings.is_prod else logging.DEBUG,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # O esquema do banco é criado/evoluído apenas via Alembic.
-    # O seed de perfis mock é feito pelo entrypoint/scripts (dev).
+    # Falha rápido se variáveis obrigatórias faltarem em produção.
+    settings.validar_obrigatorias()
+    # O esquema é criado/evoluído apenas via Alembic (entrypoint), nunca por request.
+    # Em dev, opcionalmente popula perfis mock.
+    if not settings.is_prod and settings.seed_on_startup:
+        try:
+            from scripts.seed import popular_perfis_mock
+
+            popular_perfis_mock()
+        except Exception:
+            logger.warning("Seed de perfis mock falhou no startup (dev).", exc_info=True)
     yield
 
 
@@ -76,6 +92,43 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+
+# CORS: o frontend Flet web roda em outra origem.
+_cors_origins = settings.cors_origins_list or ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=("*" not in _cors_origins),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+MAX_PAYLOAD_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+@app.middleware("http")
+async def limitar_tamanho_payload(request: Request, call_next):
+    tamanho = request.headers.get("content-length")
+    if tamanho and tamanho.isdigit() and int(tamanho) > MAX_PAYLOAD_BYTES:
+        return JSONResponse(status_code=413, content={"detail": "Payload muito grande."})
+    return await call_next(request)
+
+
+@app.get("/health")
+def health_check():
+    try:
+        verificar_conexao()
+        return {"status": "ok", "database": "conectado"}
+    except Exception as erro:
+        logger.exception("Health check falhou: banco indisponivel.")
+        raise HTTPException(status_code=503, detail="Banco indisponivel.") from erro
+
+
+@app.exception_handler(Exception)
+async def handler_erro_nao_tratado(request: Request, exc: Exception):
+    # Não vaza str(erro) cru ao cliente: loga detalhes, retorna mensagem genérica.
+    logger.exception("Erro nao tratado em %s", request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Erro interno do servidor."})
 
 
 _user_repo = PostgresUserRepository()
