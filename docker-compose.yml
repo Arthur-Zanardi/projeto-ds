@@ -1,0 +1,51 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-matchai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-matchai}
+      POSTGRES_DB: ${POSTGRES_DB:-matchai}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-matchai} -d ${POSTGRES_DB:-matchai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENV: ${ENV:-dev}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://matchai:matchai@db:5432/matchai}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-troque-em-producao-min-32-caracteres}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:8550}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      - api
+    environment:
+      # Flet roda server-side; alcanca a API pela rede interna do compose.
+      MATCHAI_API_BASE_URL: ${MATCHAI_API_BASE_URL:-http://api:8000}
+    ports:
+      - "8550:8550"
+
+volumes:
+  pgdata:
