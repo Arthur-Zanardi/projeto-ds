@@ -2,7 +2,8 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    FLET_FORCE_WEB_SERVER=true
 
 WORKDIR /app
 
@@ -16,5 +17,6 @@ RUN adduser --disabled-password --gecos "" appuser \
 USER appuser
 
 EXPOSE 8550
-# Flet roda o Python server-side; api_client (requests) chama a API via rede interna.
-CMD flet run --web --host 0.0.0.0 --port ${PORT:-8550} main.py
+# Em container headless, `python main.py` sobe o servidor web (uvicorn) do Flet.
+# A porta vem de FLET_SERVER_PORT (o Render injeta $PORT).
+CMD FLET_SERVER_PORT=${PORT:-8550} python main.py
