@@ -1,0 +1,23 @@
+# Núcleo da API
+fastapi==0.136.1
+uvicorn[standard]>=0.30.0
+pydantic==2.12.5
+pydantic-settings>=2.0.0
+python-dotenv==1.2.2
+
+# Banco de dados (PostgreSQL + pgvector)
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg[binary]>=3.1.0
+pgvector>=0.2.5
+
+# Autenticação
+bcrypt==5.0.0
+python-jose[cryptography]>=3.3.0
+
+# LLM e cliente HTTP
+groq>=1.1.1
+requests==2.33.1
+
+# Frontend
+flet==0.84.0

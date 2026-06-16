@@ -1,0 +1,67 @@
+[project]
+name = "match-ai"
+version = "0.1.0"
+description = "App de relacionamento baseado em afinidade real processada por IA"
+authors = [
+    {name = "Allanis Beatriz Oliveira Maia de Lima", email = "aboml@cin.ufpe.br"},
+    {name = "Arthur Maciel Costa Zanardi", email = "amcz@cin.ufpe.br"},
+    {name = "Emanuell Da Luz Caminha", email = "elc6@cin.ufpe.br"},
+    {name = "João Pedro Bezerra", email = "jpb@cin.ufpe.br"},
+    {name = "Nicolas Davi da Silva Souto", email = "ndss@cin.ufpe.br"},
+    {name = "Rafaell Bezerra Saraiva", email = "rbs10@cin.ufpe.br"},
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.2.2",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "psycopg[binary]>=3.1.0",
+    "pgvector>=0.2.5",
+    "bcrypt>=5.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "groq>=1.1.1",
+    "requests>=2.32.0",
+    "flet>=0.84.0",
+]
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = [
+    "flet-cli>=0.84.0",
+    "flet-desktop>=0.84.0",
+    "flet-web>=0.84.0",
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.flet]
+desktop_flavor = "light"    # Change to "full" to use flet-audio and flet-video
+org = "com.matchai"
+product = "matchai"
+company = "MatchAI"
+copyright = "Copyright (C) 2026 by MatchAI"
+
+[tool.fastapi]
+entrypoint = "src.controllers.api:app"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = ["E501", "B008"]  # E501: descrições longas; B008: FastAPI Depends() em defaults
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+"alembic/env.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"

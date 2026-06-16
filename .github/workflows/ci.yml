@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, prod-hardening]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: matchai
+          POSTGRES_PASSWORD: matchai
+          POSTGRES_DB: matchai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U matchai -d matchai_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ENV: dev
+      DATABASE_URL: postgresql+psycopg://matchai:matchai@localhost:5432/matchai_test
+      JWT_SECRET: ci-secret-ci-secret-ci-secret-1234567890
+      GROQ_API_KEY: ci-test-key
+      ADMIN_EMAILS: admin@example.com
+      SEED_ON_STARTUP: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-api.txt
+          pip install ruff pytest
+
+      - name: Ruff (lint)
+        run: ruff check .
+
+      - name: Ruff (format)
+        run: ruff format --check .
+
+      - name: Migrações Alembic
+        run: alembic upgrade head
+
+      - name: Testes
+        run: pytest -q
