@@ -17,4 +17,4 @@ USER appuser
 
 EXPOSE 8550
 # Flet roda o Python server-side; api_client (requests) chama a API via rede interna.
-CMD ["flet", "run", "--web", "--host", "0.0.0.0", "--port", "8550", "main.py"]
+CMD flet run --web --host 0.0.0.0 --port ${PORT:-8550} main.py

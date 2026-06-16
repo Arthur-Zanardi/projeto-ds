@@ -8,6 +8,7 @@ para não exigir segredos de banco/JWT no processo do frontend.
 """
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,16 @@ class Settings(BaseSettings):
 
     # Banco de dados (PostgreSQL + pgvector)
     database_url: str = ""
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalizar_driver(cls, valor: str) -> str:
+        # Render/Heroku entregam "postgres://"; SQLAlchemy precisa do driver psycopg v3.
+        if valor.startswith("postgres://"):
+            return "postgresql+psycopg://" + valor[len("postgres://"):]
+        if valor.startswith("postgresql://"):
+            return "postgresql+psycopg://" + valor[len("postgresql://"):]
+        return valor
 
     # Autenticação JWT
     jwt_secret: str = ""

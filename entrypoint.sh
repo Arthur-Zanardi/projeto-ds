@@ -3,18 +3,18 @@ set -e
 
 echo "[entrypoint] Aguardando o PostgreSQL ficar disponivel..."
 python - <<'PY'
-import os, sys, time
+import sys, time
 from sqlalchemy import create_engine, text
+from src.config import settings
 
-url = os.environ.get("DATABASE_URL", "")
+url = settings.database_url
 if not url:
     print("[entrypoint] DATABASE_URL nao definida.", file=sys.stderr)
     sys.exit(1)
 
-for tentativa in range(60):
+for _ in range(60):
     try:
-        engine = create_engine(url)
-        with engine.connect() as conn:
+        with create_engine(url).connect() as conn:
             conn.execute(text("SELECT 1"))
         print("[entrypoint] PostgreSQL pronto.")
         break
@@ -34,5 +34,5 @@ if [ "${ENV:-dev}" = "dev" ] && [ "${SEED_ON_STARTUP:-true}" = "true" ]; then
     python -m scripts.seed || echo "[entrypoint] Seed falhou (ignorado)."
 fi
 
-echo "[entrypoint] Subindo a API..."
-exec uvicorn src.controllers.api:app --host 0.0.0.0 --port 8000
+echo "[entrypoint] Subindo a API na porta ${PORT:-8000}..."
+exec uvicorn src.controllers.api:app --host 0.0.0.0 --port "${PORT:-8000}"
