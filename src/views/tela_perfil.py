@@ -221,7 +221,7 @@ def profileView(page: ft.Page) -> ft.View:
         border=ft.Border.all(1, "#FFD3E4"),
         border_radius=18,
         padding=16,
-        width=210,
+        col={"xs": 12, "sm": 4, "md": 3},
     )
 
     form_panel = ft.Container(
@@ -271,7 +271,7 @@ def profileView(page: ft.Page) -> ft.View:
         border=ft.Border.all(1, BORDER),
         border_radius=18,
         padding=18,
-        expand=True,
+        col={"xs": 12, "sm": 8, "md": 9},
     )
 
     content = ft.ListView(
@@ -296,11 +296,11 @@ def profileView(page: ft.Page) -> ft.View:
                 border_radius=18,
                 padding=16,
             ),
-            ft.Row(
+            ft.ResponsiveRow(
                 controls=[image_panel, form_panel],
                 spacing=16,
+                run_spacing=16,
                 vertical_alignment=ft.CrossAxisAlignment.START,
-                wrap=True,
             ),
         ],
     )
