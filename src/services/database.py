@@ -1,4 +1,5 @@
 import hashlib
+import logging
 
 from src.schema.schema_vetores import (
     VetorInteresses,
@@ -11,6 +12,8 @@ from src.services.user_context import (
     normalizar_email_usuario,
 )
 
+
+logger = logging.getLogger(__name__)
 
 VALOR_NEUTRO = 0.5
 MINIMO_DIMENSOES_COMPARADAS = 3
@@ -162,9 +165,10 @@ def salvar_perfil_usuario(id_usuario: str, nome: str, dados_extraidos_ia: dict):
         documents=[f"Perfil de {nome}"],
     )
 
-    print(
-        f"Perfil de {nome} salvo com sucesso! "
-        f"Tamanho do vetor: {len(vetor_usuario)} dimensoes."
+    logger.info(
+        "Perfil de %s salvo com sucesso! Tamanho do vetor: %d dimensoes.",
+        nome,
+        len(vetor_usuario),
     )
     return vetor_usuario
 
@@ -389,10 +393,10 @@ def popular_banco_mock():
     perfis_faltantes = [perfil for perfil in perfis_mock if perfil[0] not in ids_existentes]
 
     if perfis_faltantes:
-        print("Populando banco com perfis de teste...")
+        logger.info("Populando banco com perfis de teste...")
         for id_usuario, nome, *_rest, perfil in perfis_faltantes:
             salvar_perfil_vetorial(id_usuario, nome, perfil)
-        print("Perfis de teste criados!")
+        logger.info("Perfis de teste criados!")
 
     try:
         from src.services.sqlite_db import salvar_perfil_publico

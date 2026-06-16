@@ -1,10 +1,13 @@
-import os
-from dotenv import load_dotenv
+"""Integração com o LLM (Groq) para conversa e extração de vetores de perfil."""
 import json
+import logging
+import os
 
 from src.schema.schema_vetores import PerfilUsuarioVetorizado
 
-load_dotenv()
+logger = logging.getLogger(__name__)
+
+# Lido do ambiente. Na Fase 1 passa a vir de `src.config.settings`.
 CHAVE_GROQ = os.getenv("GROQ_API_KEY")
 
 client = None
@@ -25,54 +28,49 @@ def obter_cliente_groq():
     return client
 
 
-nome = "Meu nome é Rafaell Saraiva"
-idade = "Minha idade é 18 anos"
+def _system_prompt_assistente(nome_usuario: str | None = None) -> str:
+    base = (
+        "Você é o assistente do MatchAI, um aplicativo de relacionamentos. "
+        "Seu papel é conversar de forma acolhedora para ajudar a pessoa a "
+        "montar o próprio perfil e descobrir conexões reais por afinidade. "
+        "Faça perguntas leves sobre gostos, valores e personalidade. "
+        "Responda em no máximo 2 linhas."
+    )
+    if nome_usuario:
+        base += f" Quando fizer sentido, você pode se dirigir à pessoa como {nome_usuario}."
+    return base
 
-traco1 = "Sou extrovertido"
-traco2 = "Sou empático"
-traco3 = "Sou sapeca"
 
-tracos = f"Meus traços de personalidade são: {traco1}, {traco2}, e {traco3}."
-
-pessoa1 = "Pessoa 1: Letícia, 19, Estudante de Design Gráfico, Fotografia analógica e garimpo em sebos, Criativa, Espontânea, Cabelo comprido, Alta."
-pessoa2 = "Pessoa 2: Maria do Carmo, 20, Estudante de Letras, Prática de Yoga e maratonar documentários de crimes reais, Analítica, Paciente, Cabelo curto e ondulado, baixa."
-existe = False
-if (existe):
-    cabecalho = "Essas são caracteristicas minhas. Pode se referir a mim pelo nome mas não precisa mencionar ela sempre."
-else:
-    cabecalho = ""
-
-def gerar_resposta_ia(prompt_usuario):
+def gerar_resposta_ia(prompt_usuario: str, nome_usuario: str | None = None) -> str:
     try:
         completion = obter_cliente_groq().chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "system",
-                    "content": f"Você me auxilia à encontrar meu amor da minha vida. {cabecalho} {nome}.{idade}. Responda em 2 linhas"
+                    "content": _system_prompt_assistente(nome_usuario),
                 },
                 {
                     "role": "user",
-                    "content": prompt_usuario
-                }
+                    "content": prompt_usuario,
+                },
             ],
             temperature=0.7,
             max_tokens=1024,
         )
-        
+
         return completion.choices[0].message.content
 
     except Exception as e:
+        logger.exception("Erro na integração com a Groq.")
         raise LLMServiceError(f"Erro na integracao com Groq: {e}") from e
-    
 
-#função para pegar vetores
 
 def extrair_vetores_da_conversa(historico_conversa: str) -> dict:
     prompt_sistema = """
     Você é um especialista em psicologia e análise comportamental para um aplicativo de relacionamentos.
     Sua missão é ler a conversa do usuário e extrair um perfil vetorial em formato JSON.
-    
+
     Regras de Avaliação (Escala 0.00 a 1.00):
     - Avalie cada característica com base EXCLUSIVAMENTE no que foi dito no texto.
     - Se o usuário NÃO deu indícios claros sobre um tema, mantenha o valor padrão de 0.50.
@@ -134,39 +132,19 @@ def extrair_vetores_da_conversa(historico_conversa: str) -> dict:
             messages=[
                 {"role": "system", "content": prompt_sistema},
                 {
-                    "role": "user", 
-                    "content": f"Analise o seguinte trecho de conversa do usuário e gere o JSON de perfil:\n\n'{historico_conversa}'"
-                }
+                    "role": "user",
+                    "content": f"Analise o seguinte trecho de conversa do usuário e gere o JSON de perfil:\n\n'{historico_conversa}'",
+                },
             ],
-            temperature=0.0, # Mantemos em 0 para a IA ser analítica e não inventar dados
-            response_format={"type": "json_object"} # Força a API da Groq a validar que a saída é um JSON
+            temperature=0.0,
+            response_format={"type": "json_object"},
         )
-        
+
         texto_json = completion.choices[0].message.content
         dados_extraidos = json.loads(texto_json)
         perfil_validado = PerfilUsuarioVetorizado.model_validate(dados_extraidos)
         return perfil_validado.model_dump()
 
     except Exception as e:
+        logger.exception("Erro ao extrair vetores da conversa.")
         raise LLMServiceError(f"Erro ao extrair vetores: {e}") from e
-    
-
-# Teste do MVP
-"""
-if __name__ == "__main__":
-
-    print("--- Teste de Conexão IA (GROQ CLOUD) ---")
-    pergunta = "Como posso ajudar a juntar duas pessoas que estão se afastando?"
-    print(f"Pergunta: {pergunta}")
-    
-    resposta = gerar_resposta_ia(pergunta)
-    print(f"\nResposta da IA:\n{resposta}")
-"""
-# while(True):
-#     pergunta = input("Digite sua pergunta para a IA (ou 'sair' para encerrar): ")
-#     if pergunta.lower() == "sair":
-#         print("Encerrando o programa. Até mais!")
-#         break
-    
-#     resposta = gerar_resposta_ia(pergunta)
-#     print(f"\nResposta da IA:\n{resposta}\n")

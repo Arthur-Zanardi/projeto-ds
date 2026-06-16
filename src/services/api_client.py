@@ -1,8 +1,10 @@
 import asyncio
+import logging
 import os
 
 import requests
 
+logger = logging.getLogger(__name__)
 
 API_BASE_URL = os.getenv("MATCHAI_API_BASE_URL", "http://127.0.0.1:8000")
 
@@ -68,7 +70,7 @@ async def carregar_historico(usuario_logado: dict | None = None):
         return []
 
     except Exception as e:
-        print(f"Aviso: nao foi possivel carregar historico. API desligada? Erro: {e}")
+        logger.warning("Nao foi possivel carregar historico. API desligada? Erro: %s", e)
         return []
 
 
@@ -86,7 +88,7 @@ async def carregar_perfil_publico(usuario_logado: dict | None = None):
 
         return None
     except Exception as erro:
-        print(f"Aviso: nao foi possivel carregar perfil publico. Erro: {erro}")
+        logger.warning("Nao foi possivel carregar perfil publico. Erro: %s", erro)
         return None
 
 
@@ -181,7 +183,7 @@ async def listar_matches(usuario_logado: dict | None = None):
 
         return []
     except Exception as erro:
-        print(f"Aviso: nao foi possivel carregar matches. Erro: {erro}")
+        logger.warning("Nao foi possivel carregar matches. Erro: %s", erro)
         return []
 
 
@@ -262,7 +264,7 @@ async def carregar_historico_match(match_id: str, usuario_logado: dict | None = 
 
         return []
     except Exception as erro:
-        print(f"Aviso: nao foi possivel carregar conversa do match. Erro: {erro}")
+        logger.warning("Nao foi possivel carregar conversa do match. Erro: %s", erro)
         return []
 
 

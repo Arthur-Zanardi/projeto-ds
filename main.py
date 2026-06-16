@@ -1,3 +1,4 @@
+import logging
 import os
 
 import flet as ft
@@ -11,6 +12,8 @@ from src.views.conversations_view import conversationsView
 from src.views.login_view import loginView
 from src.views.match_view import matchView
 from src.views.tela_perfil import profileView
+
+logger = logging.getLogger(__name__)
 
 
 async def main(page: ft.Page):
@@ -32,7 +35,7 @@ async def main(page: ft.Page):
         page.views.append(loginView(page, autenticacao_controller))
 
     def route_change(_=None):
-        print(f"Navegando para: {page.route}")
+        logger.info("Navegando para: %s", page.route)
         page.views.clear()
 
         if page.route in ("/", "/login", "", None):
@@ -87,7 +90,7 @@ async def main(page: ft.Page):
 
     def view_pop(e):
         if e.view is not None and e.view in page.views:
-            print("View pop executado em:", e.view)
+            logger.debug("View pop executado em: %s", e.view)
             page.views.remove(e.view)
 
         top_view = page.views[-1] if page.views else None
