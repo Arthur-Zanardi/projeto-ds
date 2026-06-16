@@ -1,11 +1,10 @@
 import flet as ft
 
-from src.controllers.login_controller import LoginController
 from src.services import api_client
 from src.views.app_layout import BG_MUTED, BORDER, CORAL, PINK, TEXT_MAIN, TEXT_MUTED
 
 
-def loginView(page: ft.Page, controller: LoginController) -> ft.View:
+def loginView(page: ft.Page, controller=None) -> ft.View:
     state = {"mode": "login"}
 
     title_text = ft.Text(

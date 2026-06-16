@@ -3,9 +3,7 @@ import os
 
 import flet as ft
 
-from src.controllers.login_controller import LoginController
 from src.services.profile_images import MAX_PROFILE_IMAGE_BYTES
-from src.services.postgres_db import PostgresUserRepository
 from src.views.chat_match_view import matchChatView
 from src.views.chat_view import chatView
 from src.views.conversations_view import conversationsView
@@ -25,14 +23,11 @@ async def main(page: ft.Page):
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.padding = 0
 
-    usuario_repo = PostgresUserRepository()
-    autenticacao_controller = LoginController(usuario_repo)
-
     def usuario_autenticado():
         return bool(getattr(page, "usuario_logado", None))
 
     def mostrar_login():
-        page.views.append(loginView(page, autenticacao_controller))
+        page.views.append(loginView(page))
 
     def route_change(_=None):
         logger.info("Navegando para: %s", page.route)
