@@ -75,7 +75,7 @@ def coletar_textos(control):
 
 
 def test_formulario_mock_aparece_apenas_para_admin():
-    view_admin = matchView(PageFake("rafaellapipucos@gmail.com"))
+    view_admin = matchView(PageFake("admin@example.com"))
     view_comum = matchView(PageFake("fellipe@example.com"))
 
     textos_admin = coletar_textos(view_admin)
