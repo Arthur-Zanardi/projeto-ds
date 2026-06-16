@@ -16,8 +16,6 @@ indo além da estética.
 | LLM | [Groq](https://console.groq.com/) |
 | Deploy | Docker + Docker Compose |
 
-> A versão anterior usava SQLite + ChromaDB. Tudo foi unificado em PostgreSQL + pgvector.
-
 ## ⚙️ Variáveis de ambiente
 
 Copie `.env.example` para `.env` e preencha. Obrigatórias em produção:
@@ -82,8 +80,8 @@ O esquema é criado/evoluído **apenas via Alembic** — nunca em runtime.
 ## 🔐 Autenticação
 
 A API usa JWT. Fluxo: `POST /auth/register` e `POST /auth/login` retornam
-`access_token`. As rotas protegidas exigem `Authorization: Bearer <token>`
-(os antigos headers `X-Usuario-*` foram removidos). Admin é definido por
+`access_token`. As rotas protegidas exigem `Authorization: Bearer <token>`.
+Admin é definido por
 `ADMIN_EMAILS` e codificado no claim `is_admin` do token.
 
 ## 🧪 Testes e qualidade
