@@ -122,8 +122,4 @@ match-ai/
 
 Veja **[DEPLOY.md](DEPLOY.md)** para deploy em Render/Railway/VPS.
 
-## ⚠️ Segurança
 
-Se você clonou um histórico antigo, a `GROQ_API_KEY` pode ter sido versionada
-no passado — **revogue e gere uma nova** no console da Groq. Bancos e `.env`
-não são mais versionados (veja `.gitignore`).
