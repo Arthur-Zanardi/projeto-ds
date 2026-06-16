@@ -11,20 +11,11 @@ API_BASE_URL = settings.matchai_api_base_url
 
 
 def montar_headers_usuario(usuario_logado: dict | None = None):
+    """Monta Authorization: Bearer <token> a partir do usuario logado."""
     if not isinstance(usuario_logado, dict):
         return {}
-
-    email = str(usuario_logado.get("email") or "").strip().lower()
-    nome = str(usuario_logado.get("nome") or "").strip()
-    headers = {}
-
-    if email:
-        headers["X-Usuario-Email"] = email
-
-    if nome:
-        headers["X-Usuario-Nome"] = nome
-
-    return headers
+    token = str(usuario_logado.get("token") or "").strip()
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 
 def _json_ou_vazio(resposta):
@@ -32,6 +23,44 @@ def _json_ou_vazio(resposta):
         return resposta.json()
     except ValueError:
         return {}
+
+
+def _usuario_com_token(dados: dict) -> dict:
+    usuario = dict(dados.get("usuario") or {})
+    usuario["token"] = dados.get("access_token")
+    return usuario
+
+
+async def login(email: str, senha: str) -> dict:
+    try:
+        resposta = await asyncio.to_thread(
+            requests.post,
+            f"{API_BASE_URL}/auth/login",
+            timeout=10,
+            json={"email": email, "senha": senha},
+        )
+        if resposta.status_code == 200:
+            return {"sucesso": True, "usuario": _usuario_com_token(resposta.json())}
+        dados = _json_ou_vazio(resposta)
+        return {"sucesso": False, "mensagem": dados.get("detail", "E-mail ou senha incorretos.")}
+    except Exception as erro:
+        return {"sucesso": False, "mensagem": f"Erro de conexao com o servidor: {erro}"}
+
+
+async def registrar(email: str, senha: str, nome: str | None = None) -> dict:
+    try:
+        resposta = await asyncio.to_thread(
+            requests.post,
+            f"{API_BASE_URL}/auth/register",
+            timeout=10,
+            json={"email": email, "senha": senha, "nome": nome},
+        )
+        if resposta.status_code in (200, 201):
+            return {"sucesso": True, "usuario": _usuario_com_token(resposta.json())}
+        dados = _json_ou_vazio(resposta)
+        return {"sucesso": False, "mensagem": dados.get("detail", "Nao foi possivel cadastrar.")}
+    except Exception as erro:
+        return {"sucesso": False, "mensagem": f"Erro de conexao com o servidor: {erro}"}
 
 
 async def enviar_mensagem_chat(texto: str, usuario_logado: dict | None = None) -> str:

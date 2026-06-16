@@ -1,6 +1,7 @@
 import flet as ft
 
 from src.controllers.login_controller import LoginController
+from src.services import api_client
 from src.views.app_layout import BG_MUTED, BORDER, CORAL, PINK, TEXT_MAIN, TEXT_MUTED
 
 
@@ -117,7 +118,7 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
         page.match_deck = None
         page.go(rota)
 
-    def submeter_formulario(_):
+    async def submeter_formulario(_):
         set_error("")
         email = (txt_email.value or "").strip().lower()
         senha = txt_senha.value or ""
@@ -127,21 +128,22 @@ def loginView(page: ft.Page, controller: LoginController) -> ft.View:
             return
 
         if state["mode"] == "login":
-            usuario = controller.realizar_login(email, senha)
-            if usuario:
-                autenticar_usuario(usuario)
+            resultado = await api_client.login(email, senha)
+            if resultado.get("sucesso"):
+                autenticar_usuario(resultado["usuario"])
             else:
-                set_error("E-mail ou senha incorretos.")
+                set_error(resultado.get("mensagem") or "E-mail ou senha incorretos.")
             return
 
-        if not controller.realizar_cadastro(
-            email=email,
-            senha_pura=senha,
-        ):
-            set_error("Este e-mail ja esta cadastrado ou os dados sao invalidos.")
+        resultado = await api_client.registrar(email, senha)
+        if not resultado.get("sucesso"):
+            set_error(
+                resultado.get("mensagem")
+                or "Este e-mail ja esta cadastrado ou os dados sao invalidos."
+            )
             return
 
-        autenticar_usuario(controller.realizar_login(email, senha), "/profile")
+        autenticar_usuario(resultado["usuario"], "/profile")
 
     tabs_container = ft.Container(
         content=ft.Row([login_btn, register_btn], spacing=0),

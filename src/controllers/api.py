@@ -3,7 +3,7 @@ import re
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -29,6 +29,9 @@ from src.services.profile_completion import (
     campos_faltantes_perfil,
     perfil_publico_completo,
 )
+from src.controllers.login_controller import LoginController
+from src.services.auth import criar_access_token, get_current_user
+from src.services.postgres_db import PostgresUserRepository
 from src.services.postgres_db import (
     confirmar_match,
     criar_match_usuario,
@@ -73,6 +76,52 @@ app = FastAPI(
     version="0.2.0",
     lifespan=lifespan,
 )
+
+
+_user_repo = PostgresUserRepository()
+_login_controller = LoginController(_user_repo)
+
+
+class RegistroRequisicao(BaseModel):
+    email: str
+    senha: str
+    nome: str | None = None
+
+
+class LoginRequisicao(BaseModel):
+    email: str
+    senha: str
+
+
+def _resposta_token(usuario: dict):
+    email = usuario["email"]
+    nome = usuario.get("nome") or email.split("@")[0]
+    is_admin = usuario_eh_admin(email)
+    token = criar_access_token(email, nome, is_admin)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "usuario": {"email": email, "nome": nome, "is_admin": is_admin},
+    }
+
+
+@app.post("/auth/register", status_code=201)
+def registrar_usuario(req: RegistroRequisicao):
+    criado = _login_controller.realizar_cadastro(
+        email=req.email, senha_pura=req.senha, nome=req.nome
+    )
+    if not criado:
+        raise HTTPException(status_code=409, detail="E-mail ja cadastrado ou dados invalidos.")
+    usuario = _login_controller.realizar_login(req.email, req.senha)
+    return _resposta_token(usuario)
+
+
+@app.post("/auth/login")
+def login_usuario(req: LoginRequisicao):
+    usuario = _login_controller.realizar_login(req.email, req.senha)
+    if not usuario:
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+    return _resposta_token(usuario)
 
 
 class MensagemTextoObrigatorio(BaseModel):
@@ -181,25 +230,6 @@ class MensagemConversaMatch(BaseModel):
             raise ValueError("O campo nao pode ser vazio.")
 
         return texto
-
-
-def obter_usuario_atual(x_usuario_email=None, x_usuario_nome=None):
-    if not isinstance(x_usuario_email, str):
-        x_usuario_email = None
-
-    if not isinstance(x_usuario_nome, str):
-        x_usuario_nome = None
-
-    email = normalizar_email_usuario(x_usuario_email)
-    nome = normalizar_nome_usuario(x_usuario_nome, email)
-    return {"email": email, "nome": nome}
-
-
-def obter_usuario_request(request: Request):
-    return obter_usuario_atual(
-        x_usuario_email=request.headers.get("X-Usuario-Email"),
-        x_usuario_nome=request.headers.get("X-Usuario-Nome"),
-    )
 
 
 def slugify(texto: str):
@@ -353,7 +383,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         acao="validacao",
         status="erro",
         mensagem="Entrada invalida.",
-        usuario=obter_usuario_request(request)["email"],
+        usuario=None,
         detalhes={"erros": erros},
     )
     return JSONResponse(status_code=422, content={"detail": erros})
@@ -366,20 +396,16 @@ def read_root():
 
 @app.get("/perfil_publico")
 def pegar_perfil_publico(
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
     return {"perfil": anexar_status_perfil(perfil_publico_ou_padrao(usuario_atual))}
 
 
 @app.put("/perfil_publico")
 def atualizar_perfil_publico(
     perfil: PerfilPublicoPayload,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
     perfil_salvo = salvar_perfil_publico(
         usuario=usuario_atual["email"],
         nome=perfil.nome or usuario_atual["nome"],
@@ -397,12 +423,10 @@ def atualizar_perfil_publico(
 @app.post("/perfis_mock", status_code=201)
 def criar_perfil_mock(
     perfil: CriarPerfilMockRequisicao,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
-    if not usuario_eh_admin(usuario_atual["email"]):
+    if not usuario_atual["is_admin"]:
         raise HTTPException(
             status_code=403,
             detail="Apenas administradores podem criar perfis mock.",
@@ -436,10 +460,8 @@ def criar_perfil_mock(
 
 @app.get("/historico")
 def pegar_historico(
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
         historico = obter_historico_chat(usuario=usuario_atual["email"])
@@ -466,10 +488,8 @@ def pegar_historico(
 
 @app.get("/logs")
 def pegar_logs(
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
         logs = obter_logs_api(usuario=usuario_atual["email"])
@@ -481,10 +501,8 @@ def pegar_logs(
 
 @app.get("/matches")
 def pegar_matches(
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
         matches = [limpar_dados_visiveis(match) for match in listar_matches_usuario(usuario=usuario_atual["email"])]
@@ -512,13 +530,11 @@ def pegar_matches(
 @app.post("/matches", status_code=201)
 def criar_match_api(
     match: CriarMatchRequisicao,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
-        if match_eh_mock_customizado(match) and not usuario_eh_admin(usuario_atual["email"]):
+        if match_eh_mock_customizado(match) and not usuario_atual["is_admin"]:
             registrar_evento(
                 endpoint="/matches",
                 acao="criar_match",
@@ -566,10 +582,8 @@ def criar_match_api(
 def registrar_acao_match_api(
     match_id: str,
     acao: AcaoMatchRequisicao,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
     usuario_email = usuario_atual["email"]
     match_id = str(match_id or "").strip().lower()
 
@@ -621,10 +635,8 @@ def registrar_acao_match_api(
 @app.get("/matches/{match_id}/mensagens")
 def pegar_mensagens_match(
     match_id: str,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
         match = obter_match_usuario(usuario=usuario_atual["email"], match_id=match_id)
@@ -668,10 +680,8 @@ def pegar_mensagens_match(
 def enviar_mensagem_match(
     match_id: str,
     mensagem: MensagemConversaMatch,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
         salvar_mensagem_match(
@@ -721,10 +731,8 @@ def enviar_mensagem_match(
 @app.post("/chat")
 def conversar_com_ia(
     mensagem: MensagemTextoObrigatorio,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     registrar_evento(
         endpoint="/chat",
@@ -792,10 +800,8 @@ def conversar_com_ia(
 @app.post("/analisar_perfil")
 def analisar_perfil(
     mensagem: MensagemTextoObrigatorio,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
         vetores_json = extrair_vetores_da_conversa(mensagem.texto)
@@ -822,10 +828,8 @@ def analisar_perfil(
 @app.post("/dar_match")
 def calcular_match_final(
     mensagem: MensagemMatch,
-    x_usuario_email: str | None = Header(default=None, alias="X-Usuario-Email"),
-    x_usuario_nome: str | None = Header(default=None, alias="X-Usuario-Nome"),
+    usuario_atual: dict = Depends(get_current_user),
 ):
-    usuario_atual = obter_usuario_atual(x_usuario_email, x_usuario_nome)
 
     try:
         perfil_publico = perfil_publico_ou_padrao(usuario_atual)
