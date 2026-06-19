@@ -4,6 +4,8 @@ O **MatchAI** é um aplicativo de relacionamento focado na Geração Z que usa I
 para gerar conexões por **afinidade real** — valores, personalidade e interesses —
 indo além da estética.
 
+### DEPLOY
+| LINK | https://matchai-web.onrender.com/
 ## 🧱 Stack
 
 | Camada | Tecnologia |
